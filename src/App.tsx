@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { Layout } from '@/components/Layout'
 import { ProtectedRoute, AdminRoute } from '@/components/ProtectedRoute'
@@ -12,7 +12,7 @@ import { QRPage } from '@/pages/QRPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -26,6 +26,6 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

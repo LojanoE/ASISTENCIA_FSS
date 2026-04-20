@@ -1,11 +1,8 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { useLocation } from 'react-router-dom'
 import { Printer } from 'lucide-react'
 
 export function QRPage() {
-  const location = useLocation()
-  const baseUrl = window.location.origin
-  const qrUrl = `${baseUrl}/`
+  const qrUrl = window.location.origin + '/ASISTENCIA_FSS/'
 
   return (
     <div className="space-y-6 max-w-md mx-auto">
