@@ -1,19 +1,30 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Clock } from '@/components/Clock'
 import { PinPad } from '@/components/PinPad'
-import { LogIn } from 'lucide-react'
+import { LogIn, AlertTriangle } from 'lucide-react'
 
 export function HomePage() {
-  const { session, login } = useAuth()
-  const navigate = useNavigate()
+  const { session, login, dbError } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   if (session) {
-    navigate('/dashboard', { replace: true })
-    return null
+    return <Navigate to="/dashboard" replace />
+  }
+
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-red-50 flex flex-col items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-red-200 p-8 text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-800 mb-2">Error de Configuración</h1>
+          <p className="text-gray-600 text-sm mb-4">{dbError}</p>
+          <p className="text-gray-500 text-xs">Verifica que las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY estén configuradas correctamente en el archivo .env</p>
+        </div>
+      </div>
+    )
   }
 
   const handleLogin = async (pin: string) => {
@@ -21,9 +32,7 @@ export function HomePage() {
     setError(null)
     const result = await login(pin)
     setLoading(false)
-    if (result.success) {
-      navigate('/dashboard')
-    } else {
+    if (!result.success) {
       setError(result.error || 'Error desconocido')
     }
   }

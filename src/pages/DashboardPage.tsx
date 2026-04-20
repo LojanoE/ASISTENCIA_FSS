@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useClock } from '@/hooks/useClock'
 import { useSettings } from '@/hooks/useSettings'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { getCurrentPosition, isWithinGeofence } from '@/lib/geolocation'
 import { getCurrentDate, formatTime, getStatusLabel, getDayStatusColor } from '@/lib/utils'
 import { Clock } from '@/components/Clock'
@@ -12,7 +11,6 @@ import type { AttendanceStatus } from '@/lib/types'
 export function DashboardPage() {
   const { session } = useAuth()
   const { schedule, geofence } = useSettings()
-  const { time24 } = useClock()
   const [todayRecord, setTodayRecord] = useState<AttendanceStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
@@ -21,18 +19,22 @@ export function DashboardPage() {
   const today = getCurrentDate()
 
   useEffect(() => {
-    loadTodayRecord()
+    if (session?.workerId) loadTodayRecord()
   }, [session?.workerId])
 
   async function loadTodayRecord() {
     if (!session) return
-    const { data } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('worker_id', session.workerId)
-      .eq('date', today)
-      .single()
-    setTodayRecord(data as AttendanceStatus | null)
+    try {
+      const { data } = await getSupabase()
+        .from('attendance')
+        .select('*')
+        .eq('worker_id', session.workerId)
+        .eq('date', today)
+        .single()
+      setTodayRecord(data as AttendanceStatus | null)
+    } catch (err) {
+      console.error('Error loading today record:', err)
+    }
   }
 
   async function handleRegister(type: 'entry' | 'exit') {
@@ -60,7 +62,7 @@ export function DashboardPage() {
 
     try {
       const fn = type === 'entry' ? 'register_entry' : 'register_exit'
-      const { data, error } = await supabase.rpc(fn, {
+      const { data, error } = await getSupabase().rpc(fn, {
         p_worker_id: session.workerId,
         p_latitude: latitude,
         p_longitude: longitude,
@@ -79,7 +81,7 @@ export function DashboardPage() {
         }
       }
     } catch {
-      setMessage({ type: 'error', text: 'Error de conexión' })
+      setMessage({ type: 'error', text: 'Error de conexión. Verifica tu internet.' })
     } finally {
       setLoading(false)
     }
@@ -204,13 +206,17 @@ function HistorySection({ workerId }: { workerId: string }) {
   }, [workerId])
 
   async function loadHistory() {
-    const { data } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('worker_id', workerId)
-      .order('date', { ascending: false })
-      .limit(14)
-    setRecords((data as AttendanceStatus[]) || [])
+    try {
+      const { data } = await getSupabase()
+        .from('attendance')
+        .select('*')
+        .eq('worker_id', workerId)
+        .order('date', { ascending: false })
+        .limit(14)
+      setRecords((data as AttendanceStatus[]) || [])
+    } catch (err) {
+      console.error('Error loading history:', err)
+    }
   }
 
   if (records.length === 0) return null

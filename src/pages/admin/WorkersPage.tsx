@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 import type { Worker } from '@/lib/types'
 
@@ -17,7 +17,7 @@ export function WorkersPage() {
   useEffect(() => { loadWorkers() }, [])
 
   async function loadWorkers() {
-    const { data } = await supabase.from('workers').select('*').order('name')
+    const { data } = await getSupabase().from('workers').select('*').order('name')
     setWorkers((data as Worker[]) || [])
   }
 
@@ -31,10 +31,10 @@ export function WorkersPage() {
       if (editing) {
         const updateData: Record<string, unknown> = { name: formData.name, role: formData.role }
         if (formData.pin) {
-          const { data: hashResult } = await supabase.rpc('hash_pin', { pin_input: formData.pin })
+          const { data: hashResult } = await getSupabase().rpc('hash_pin', { pin_input: formData.pin })
           updateData.pin_hash = hashResult
         }
-        const { error } = await supabase.from('workers').update(updateData).eq('id', editing.id)
+        const { error } = await getSupabase().from('workers').update(updateData).eq('id', editing.id)
         if (error) throw error
         setMessage({ type: 'success', text: 'Trabajador actualizado' })
       } else {
@@ -43,8 +43,8 @@ export function WorkersPage() {
           setLoading(false)
           return
         }
-        const { data: hashResult } = await supabase.rpc('hash_pin', { pin_input: formData.pin })
-        const { error } = await supabase.from('workers').insert({
+        const { data: hashResult } = await getSupabase().rpc('hash_pin', { pin_input: formData.pin })
+        const { error } = await getSupabase().from('workers').insert({
           name: formData.name,
           pin_hash: hashResult,
           role: formData.role,
@@ -64,7 +64,7 @@ export function WorkersPage() {
   }
 
   async function toggleActive(worker: Worker) {
-    const { error } = await supabase.from('workers').update({ active: !worker.active }).eq('id', worker.id)
+    const { error } = await getSupabase().from('workers').update({ active: !worker.active }).eq('id', worker.id)
     if (!error) await loadWorkers()
   }
 

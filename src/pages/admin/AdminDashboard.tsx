@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { useSettings } from '@/hooks/useSettings'
 import { formatTime, getStatusLabel, getDayStatusColor } from '@/lib/utils'
 import { Link } from 'react-router-dom'
@@ -20,23 +20,27 @@ export function AdminDashboard() {
   }, [])
 
   async function loadStats() {
-    const { count: wCount } = await supabase
-      .from('workers')
-      .select('*', { count: 'exact', head: true })
-      .eq('active', true)
-    setWorkerCount(wCount || 0)
+    try {
+      const { count: wCount } = await getSupabase()
+        .from('workers')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+      setWorkerCount(wCount || 0)
 
-    const { data: todayData } = await supabase
-      .from('attendance')
-      .select('*, worker:workers(name)')
-      .eq('date', today)
-      .order('entry_time', { ascending: true })
+      const { data: todayData } = await getSupabase()
+        .from('attendance')
+        .select('*, worker:workers(name)')
+        .eq('date', today)
+        .order('entry_time', { ascending: true })
 
     const records = (todayData as (AttendanceStatus & { worker?: Worker })[]) || []
     setRecentAttendance(records)
     setTodayPresent(records.filter(r => r.status === 'presente').length)
     setTodayLate(records.filter(r => r.status === 'atraso').length)
     setTodayAbsent((wCount || 0) - records.length)
+    } catch (err) {
+      console.error('Error loading stats:', err)
+    }
   }
 
   const stats = [

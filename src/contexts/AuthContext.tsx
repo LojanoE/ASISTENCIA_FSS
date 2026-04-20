@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
-import type { SessionData, WorkerRole, Worker } from '@/lib/types'
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
+import type { SessionData, WorkerRole } from '@/lib/types'
 
 interface AuthContextType {
   session: SessionData | null
   loading: boolean
+  dbError: string | null
   login: (pin: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
 }
@@ -16,8 +17,15 @@ const SESSION_KEY = 'fss_session'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setDbError('Supabase no está configurado. Verifica las variables de entorno en el archivo .env')
+      setLoading(false)
+      return
+    }
+
     const stored = localStorage.getItem(SESSION_KEY)
     if (stored) {
       try {
@@ -31,12 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (pin: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.rpc('verify_pin', { pin_input: pin })
+      const { data, error } = await getSupabase().rpc('verify_pin', { pin_input: pin })
 
-      if (error) return { success: false, error: 'Error de conexión' }
+      if (error) return { success: false, error: 'Error de conexión con la base de datos' }
       if (!data || data.length === 0) return { success: false, error: 'PIN incorrecto' }
 
-      const worker: Worker & { match: boolean } = data[0]
+      const worker = data[0]
       if (!worker.active) return { success: false, error: 'Cuenta desactivada' }
 
       const newSession: SessionData = {
@@ -47,8 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession)
       localStorage.setItem(SESSION_KEY, JSON.stringify(newSession))
       return { success: true }
-    } catch {
-      return { success: false, error: 'Error de conexión' }
+    } catch (err) {
+      console.error('Login error:', err)
+      return { success: false, error: 'Error de conexión. Verifica tu internet.' }
     }
   }, [])
 
@@ -58,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ session, loading, login, logout }}>
+    <AuthContext.Provider value={{ session, loading, dbError, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

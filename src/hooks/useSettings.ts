@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import type { AppSettings, WorkScheduleConfig, GeofenceConfig } from '@/lib/types'
 
 export function useSettings() {
@@ -9,7 +9,7 @@ export function useSettings() {
 
   const loadSettings = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('settings').select('*')
+      const { data, error } = await getSupabase().from('settings').select('*')
       if (error) throw error
 
       const settings = (data as AppSettings[]).reduce((acc, s) => {
@@ -32,7 +32,7 @@ export function useSettings() {
   useEffect(() => { loadSettings() }, [loadSettings])
 
   const updateSetting = useCallback(async (key: string, value: string) => {
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('settings')
       .upsert({ key, value }, { onConflict: 'key' })
     if (error) throw error

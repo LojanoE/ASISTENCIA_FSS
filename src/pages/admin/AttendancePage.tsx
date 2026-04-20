@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatTime, getStatusLabel, getDayStatusColor, formatDate } from '@/lib/utils'
 import { Search, FileCheck, X } from 'lucide-react'
@@ -24,17 +24,22 @@ export function AttendancePage() {
   }, [dateFilter, workerFilter])
 
   async function loadWorkers() {
-    const { data } = await supabase.from('workers').select('*').eq('active', true).order('name')
-    setWorkers((data as Worker[]) || [])
+    try {
+      const { data } = await getSupabase().from('workers').select('*').eq('active', true).order('name')
+      setWorkers((data as Worker[]) || [])
+    } catch (err) {
+      console.error('Error loading workers:', err)
+    }
   }
 
   async function loadAttendance() {
     setLoading(true)
-    let query = supabase
-      .from('attendance')
-      .select('*')
-      .eq('date', dateFilter)
-      .order('entry_time', { ascending: true })
+    try {
+      let query = getSupabase()
+        .from('attendance')
+        .select('*')
+        .eq('date', dateFilter)
+        .order('entry_time', { ascending: true })
 
     if (workerFilter) {
       query = query.eq('worker_id', workerFilter)
@@ -46,18 +51,21 @@ export function AttendancePage() {
     const workerMap = new Map(workers.map(w => [w.id, w]))
     const enriched = records.map(r => ({ ...r, worker: workerMap.get(r.worker_id) }))
     setAttendance(enriched as unknown as AttendanceStatus[])
+    } catch (err) {
+      console.error('Error loading attendance:', err)
+    }
     setLoading(false)
   }
 
   async function justifyAtendance(attendanceId: string) {
     if (!reason.trim() || !session) return
-    const { error } = await supabase.from('justifications').insert({
+    const { error } = await getSupabase().from('justifications').insert({
       attendance_id: attendanceId,
       reason: reason.trim(),
       authorized_by: session.workerId,
     })
     if (!error) {
-      await supabase.from('attendance').update({ status: 'justificado' }).eq('id', attendanceId)
+      await getSupabase().from('attendance').update({ status: 'justificado' }).eq('id', attendanceId)
       setShowJustify(null)
       setReason('')
       await loadAttendance()
@@ -66,7 +74,7 @@ export function AttendancePage() {
 
   async function deleteAttendance(id: string) {
     if (!confirm('¿Eliminar este registro de asistencia?')) return
-    await supabase.from('attendance').delete().eq('id', id)
+    await getSupabase().from('attendance').delete().eq('id', id)
     await loadAttendance()
   }
 
