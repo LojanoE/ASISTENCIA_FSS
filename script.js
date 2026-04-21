@@ -60,6 +60,7 @@ const fruitDateFrom = document.getElementById('fruitDateFrom');
 const fruitDateTo = document.getElementById('fruitDateTo');
 
 // Fruit View — Nacional
+const fruitNationalSupplier = document.getElementById('fruitNationalSupplier');
 const fruitNationalCrates = document.getElementById('fruitNationalCrates');
 const fruitNationalObs = document.getElementById('fruitNationalObs');
 const fruitNationalEntriesBody = document.getElementById('fruitNationalEntriesBody');
@@ -90,7 +91,7 @@ btnOut.addEventListener('click', () => registerAttendance('Salida'));
 
 btnAddWorker.addEventListener('click', addWorker);
 btnSaveSettings.addEventListener('click', saveSettings);
-document.getElementById('btnExport').addEventListener('click', exportCSV);
+document.getElementById('btnExport').addEventListener('click', exportAttendanceExcel);
 
 filterDateFrom.addEventListener('change', renderAdminDashboard);
 filterDateTo.addEventListener('change', renderAdminDashboard);
@@ -106,7 +107,7 @@ document.getElementById('btnFruit').addEventListener('click', showFruitView);
 document.getElementById('btnBackToAdmin').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
 document.getElementById('btnAddFruit').addEventListener('click', addFruitEntry);
 document.getElementById('btnAddNational').addEventListener('click', addNationalEntry);
-document.getElementById('btnExportFruit').addEventListener('click', exportFruitCSV);
+document.getElementById('btnExportFruit').addEventListener('click', exportFruitExcel);
 
 fruitDateFrom.addEventListener('change', renderFruitSummary);
 fruitDateTo.addEventListener('change', renderFruitSummary);
@@ -463,7 +464,20 @@ function getStatusClass(status) {
     }
 }
 
-function exportCSV() {
+function downloadExcel(htmlTable, filename) {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Hoja1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body>${htmlTable}</body></html>`;
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportAttendanceExcel() {
     const allRecords = getRecords();
     const from = filterDateFrom.value;
     const to = filterDateTo.value;
@@ -476,16 +490,14 @@ function exportCSV() {
 
     if (filteredRecords.length === 0) return alert('No hay registros para exportar en este rango');
 
-    let csv = "Trabajador,Tipo,Fecha,Hora,Estado,Detalles,Minutos_Diferencia,Lat,Lon,Observacion\n";
+    let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
+    html += '<tr style="background-color:#2563eb;color:white;font-weight:bold;"><td>Trabajador</td><td>Tipo</td><td>Fecha</td><td>Hora</td><td>Estado</td><td>Detalles</td><td>Min. Diferencia</td><td>Lat</td><td>Lon</td><td>Observacion</td></tr>';
     filteredRecords.forEach(r => {
-        csv += `"${r.worker}",${r.type},${r.date},${r.time},${r.status},"${r.extra}",${r.diffMins || 0},${r.lat},${r.lon},"${r.observation || ''}"\n`;
+        html += `<tr><td>${escapeHTML(r.worker)}</td><td>${r.type}</td><td>${r.date}</td><td>${r.time}</td><td>${r.status}</td><td>${escapeHTML(r.extra || '')}</td><td>${r.diffMins || 0}</td><td>${r.lat}</td><td>${r.lon}</td><td>${escapeHTML(r.observation || '')}</td></tr>`;
     });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `asistencia_${from}_al_${to}.csv`;
-    a.click();
+    html += '</table>';
+
+    downloadExcel(html, `asistencia_${from}_al_${to}.xls`);
 }
 
 function escapeHTML(str) {
@@ -528,14 +540,16 @@ function getFruitRecords() {
 // --- Nacional ---
 
 function addNationalEntry() {
+    const supplier = fruitNationalSupplier.value.trim();
     const crates = parseInt(fruitNationalCrates.value, 10);
+    if (!supplier) return alert('Ingrese el nombre del proveedor');
     if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
 
     const now = new Date();
     const record = {
         id: Date.now(),
         type: 'Nacional',
-        supplier: '',
+        supplier: supplier,
         crates: crates,
         weight: 0,
         date: now.toLocaleDateString(),
@@ -547,9 +561,11 @@ function addNationalEntry() {
     records.unshift(record);
     localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
 
+    fruitNationalSupplier.value = '';
     fruitNationalCrates.value = '5';
     fruitNationalObs.value = '';
     renderNationalEntries();
+    renderSupplierDatalist();
 }
 
 window.deleteNationalEntry = function(id) {
@@ -569,12 +585,13 @@ function renderNationalEntries() {
 
     fruitNationalEntriesBody.innerHTML = records.map(r => `
         <tr>
+            <td>${escapeHTML(r.supplier)}</td>
             <td>${r.crates}</td>
             <td>${r.time}</td>
             <td><small>${escapeHTML(r.observation || '-')}</small></td>
             <td><button class="btn btn-danger-sm" onclick="deleteNationalEntry(${r.id})">X</button></td>
         </tr>
-    `).join('') || '<tr><td colspan="4" class="text-center">Sin registros hoy</td></tr>';
+    `).join('') || '<tr><td colspan="5" class="text-center">Sin registros hoy</td></tr>';
 }
 
 // --- Exportación ---
@@ -643,7 +660,7 @@ function renderExportEntries() {
 
 function renderSupplierDatalist() {
     const records = getFruitRecords();
-    const suppliers = [...new Set(records.filter(r => r.type === 'Exportación').map(r => r.supplier).filter(Boolean))];
+    const suppliers = [...new Set(records.map(r => r.supplier).filter(Boolean))];
     const datalist = document.getElementById('supplierList');
     datalist.innerHTML = suppliers.map(s => `<option value="${escapeHTML(s)}">`).join('');
 }
@@ -669,13 +686,18 @@ function renderFruitSummary() {
     const byDate = {};
     filtered.forEach(r => {
         if (!byDate[r.date]) byDate[r.date] = {};
-        const key = r.type === 'Nacional' ? `Nacional||${r.date}` : `${r.supplier}||${r.type}`;
+        const key = r.supplier;
         if (!byDate[r.date][key]) {
-            byDate[r.date][key] = { supplier: r.supplier, type: r.type, count: 0, crates: 0, weight: 0 };
+            byDate[r.date][key] = { supplier: r.supplier, nacCrates: 0, nacCount: 0, expCrates: 0, expCount: 0, weight: 0 };
         }
-        byDate[r.date][key].count++;
-        byDate[r.date][key].crates += r.crates;
-        byDate[r.date][key].weight += r.weight;
+        if (r.type === 'Nacional') {
+            byDate[r.date][key].nacCrates += r.crates;
+            byDate[r.date][key].nacCount++;
+        } else {
+            byDate[r.date][key].expCrates += r.crates;
+            byDate[r.date][key].expCount++;
+            byDate[r.date][key].weight += r.weight;
+        }
     });
 
     const sortedDates = Object.keys(byDate).sort((a, b) => {
@@ -684,53 +706,56 @@ function renderFruitSummary() {
         return `${ya}-${ma.padStart(2,'0')}-${da.padStart(2,'0')}`.localeCompare(`${yb}-${mb.padStart(2,'0')}-${db.padStart(2,'0')}`);
     });
 
-    let totalCount = 0, totalCrates = 0, totalWeight = 0;
+    let totalNacCrates = 0, totalExpCrates = 0, totalWeight = 0;
     let html = '';
 
     sortedDates.forEach(date => {
         const entries = Object.values(byDate[date]);
-        let dateCount = 0, dateCrates = 0, dateWeight = 0;
+        let dateNacCrates = 0, dateExpCrates = 0, dateWeight = 0;
 
         html += `<tr class="summary-date-row"><td colspan="5"><strong>${date}</strong></td></tr>`;
 
         entries.forEach(e => {
+            const nacDisplay = e.nacCrates > 0 ? e.nacCrates : '—';
+            const expDisplay = e.expCrates > 0 ? e.expCrates : '—';
+            const weightDisplay = e.weight > 0 ? e.weight.toFixed(1) : '—';
             html += `<tr>
-                <td><span class="badge ${e.type === 'Nacional' ? 'bg-info' : 'bg-success'}">${e.type === 'Nacional' ? 'Nacional' : 'Exportación'}</span></td>
-                <td>${e.type === 'Nacional' ? '—' : escapeHTML(e.supplier)}</td>
-                <td>${e.count}</td>
-                <td>${e.crates}</td>
-                <td>${e.type === 'Nacional' ? '—' : e.weight.toFixed(1)}</td>
+                <td>${e.nacCrates > 0 ? '<span class="badge bg-info">Nac.</span>' : ''}${e.expCrates > 0 ? '<span class="badge bg-success">Exp.</span>' : ''}</td>
+                <td>${escapeHTML(e.supplier)}</td>
+                <td>${nacDisplay}</td>
+                <td>${expDisplay}</td>
+                <td>${weightDisplay}</td>
             </tr>`;
-            dateCount += e.count;
-            dateCrates += e.crates;
+            dateNacCrates += e.nacCrates;
+            dateExpCrates += e.expCrates;
             dateWeight += e.weight;
         });
 
         html += `<tr class="summary-date-subtotal">
             <td><em>Subtotal ${date}</em></td>
             <td></td>
-            <td>${dateCount}</td>
-            <td>${dateCrates}</td>
-            <td>${dateWeight.toFixed(1)}</td>
+            <td>${dateNacCrates > 0 ? dateNacCrates : '—'}</td>
+            <td>${dateExpCrates > 0 ? dateExpCrates : '—'}</td>
+            <td>${dateWeight > 0 ? dateWeight.toFixed(1) : '—'}</td>
         </tr>`;
 
-        totalCount += dateCount;
-        totalCrates += dateCrates;
+        totalNacCrates += dateNacCrates;
+        totalExpCrates += dateExpCrates;
         totalWeight += dateWeight;
     });
 
     html += `<tr class="summary-grand-total">
         <td><strong>TOTAL</strong></td>
         <td></td>
-        <td><strong>${totalCount}</strong></td>
-        <td><strong>${totalCrates}</strong></td>
+        <td><strong>${totalNacCrates}</strong></td>
+        <td><strong>${totalExpCrates}</strong></td>
         <td><strong>${totalWeight.toFixed(1)}</strong></td>
     </tr>`;
 
     fruitSummaryBody.innerHTML = html;
 }
 
-function exportFruitCSV() {
+function exportFruitExcel() {
     const from = fruitDateFrom.value;
     const to = fruitDateTo.value;
     const allRecords = getFruitRecords();
@@ -743,14 +768,60 @@ function exportFruitCSV() {
 
     if (filtered.length === 0) return alert('No hay registros para exportar en este rango');
 
-    let csv = "Tipo,Proveedor,Gavetas,Peso_kg,Fecha,Hora,Observacion\n";
+    const byDate = {};
     filtered.forEach(r => {
-        csv += `${r.type},"${r.supplier || ''}",${r.crates},${r.weight},${r.date},${r.time},"${r.observation || ''}"\n`;
+        if (!byDate[r.date]) byDate[r.date] = {};
+        const key = r.supplier;
+        if (!byDate[r.date][key]) {
+            byDate[r.date][key] = { supplier: r.supplier, nacCrates: 0, expCrates: 0, weight: 0 };
+        }
+        if (r.type === 'Nacional') {
+            byDate[r.date][key].nacCrates += r.crates;
+        } else {
+            byDate[r.date][key].expCrates += r.crates;
+            byDate[r.date][key].weight += r.weight;
+        }
     });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fruta_${from}_al_${to}.csv`;
-    a.click();
+
+    const sortedDates = Object.keys(byDate).sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return `${ya}-${ma.padStart(2,'0')}-${da.padStart(2,'0')}`.localeCompare(`${yb}-${mb.padStart(2,'0')}-${db.padStart(2,'0')}`);
+    });
+
+    const hdrStyle = 'style="background-color:#2563eb;color:white;font-weight:bold;"';
+    const subStyle = 'style="background-color:#dbeafe;font-weight:bold;"';
+    const totStyle = 'style="background-color:#2563eb;color:white;font-weight:bold;"';
+
+    let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
+    html += `<tr ${hdrStyle}><td>Fecha</td><td>Tipo</td><td>Proveedor</td><td>Gav. Nac.</td><td>Gav. Exp.</td><td>Peso (kg)</td></tr>`;
+
+    let grandNac = 0, grandExp = 0, grandWeight = 0;
+
+    sortedDates.forEach(date => {
+        const entries = Object.values(byDate[date]);
+        let dateNac = 0, dateExp = 0, dateW = 0;
+
+        entries.forEach(e => {
+            html += `<tr><td>${date}</td>`;
+            html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'Exportación' : ''}</td>`;
+            html += `<td>${escapeHTML(e.supplier)}</td>`;
+            html += `<td>${e.nacCrates > 0 ? e.nacCrates : ''}</td>`;
+            html += `<td>${e.expCrates > 0 ? e.expCrates : ''}</td>`;
+            html += `<td>${e.weight > 0 ? e.weight.toFixed(1) : ''}</td></tr>`;
+            dateNac += e.nacCrates;
+            dateExp += e.expCrates;
+            dateW += e.weight;
+        });
+
+        html += `<tr ${subStyle}><td colspan="3">Subtotal ${date}</td><td>${dateNac}</td><td>${dateExp}</td><td>${dateW.toFixed(1)}</td></tr>`;
+        grandNac += dateNac;
+        grandExp += dateExp;
+        grandWeight += dateW;
+    });
+
+    html += `<tr ${totStyle}><td colspan="3">TOTAL</td><td>${grandNac}</td><td>${grandExp}</td><td>${grandWeight.toFixed(1)}</td></tr>`;
+    html += '</table>';
+
+    downloadExcel(html, `fruta_${from}_al_${to}.xls`);
 }

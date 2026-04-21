@@ -122,7 +122,7 @@
                                 <input type="date" id="filterDateTo" style="padding: 0.4rem; font-size: 0.8rem;">
                             </div>
                         </div>
-                        <button id="btnExport" class="btn btn-outline">Exportar CSV</button>
+                        <button id="btnExport" class="btn btn-outline">Exportar Excel</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -165,7 +165,11 @@
                 <div class="card">
                     <h2>Registro Nacional</h2>
                     <div class="form-group">
-                        <label for="fruitNationalCrates">Gavetas Totales</label>
+                        <label for="fruitNationalSupplier">Proveedor</label>
+                        <input type="text" id="fruitNationalSupplier" placeholder="Nombre del proveedor" list="supplierList">
+                    </div>
+                    <div class="form-group">
+                        <label for="fruitNationalCrates">Gavetas</label>
                         <input type="number" id="fruitNationalCrates" value="5" min="1" inputmode="numeric">
                     </div>
                     <div class="form-group">
@@ -182,6 +186,7 @@
                         <table>
                             <thead>
                                 <tr>
+                                    <th>Proveedor</th>
                                     <th>Gavetas</th>
                                     <th>Hora</th>
                                     <th>Observación</th>
@@ -255,7 +260,7 @@
                                 <input type="date" id="fruitDateTo" style="padding: 0.4rem; font-size: 0.8rem;">
                             </div>
                         </div>
-                        <button id="btnExportFruit" class="btn btn-outline">Exportar CSV</button>
+                        <button id="btnExportFruit" class="btn btn-outline">Exportar Excel</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -263,8 +268,8 @@
                                 <tr>
                                     <th>Tipo</th>
                                     <th>Proveedor</th>
-                                    <th>Registros</th>
-                                    <th>Gavetas</th>
+                                    <th>Gav. Nac.</th>
+                                    <th>Gav. Exp.</th>
                                     <th>Peso (kg)</th>
                                 </tr>
                             </thead>
