@@ -1,7 +1,38 @@
-// --- CONFIGURACIÓN ---
+// --- CONFIGURACIÃ“N ---
 const SESSION_KEY = 'attendance_session_v3';
+const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_settings_v3', 'attendance_fruit_v3'];
 
-// --- ELEMENTOS DEL DOM ---
+// --- HELPERS ---
+function todayStr() {
+    return new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function timeStr() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function withLoading(btn, text, fn) {
+    return async function() {
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = text;
+        try {
+            await fn();
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
+    };
+}
+
+function cleanupOldData() {
+    OLD_KEYS.forEach(key => localStorage.removeItem(key));
+}
+
+function handleDbError(err) {
+    console.error('DB Error:', err);
+    alert('Error de conexiÃ³n. Verifique su acceso a internet e intente de nuevo.');
+}
 const views = {
     login: document.getElementById('view-login'),
     worker: document.getElementById('view-worker'),
@@ -33,14 +64,14 @@ const adminAttendanceBody = document.getElementById('adminAttendanceBody');
 const filterDateFrom = document.getElementById('filterDateFrom');
 const filterDateTo = document.getElementById('filterDateTo');
 
-// Modal de Edición
+// Modal de EdiciÃ³n
 const editModal = document.getElementById('editModal');
 const editTime = document.getElementById('editTime');
 const editObservation = document.getElementById('editObservation');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
 
-// Fruit View — Export
+// Fruit View â€” Export
 const fruitSupplier = document.getElementById('fruitSupplier');
 const fruitCrates = document.getElementById('fruitCrates');
 const fruitWeight = document.getElementById('fruitWeight');
@@ -51,7 +82,7 @@ const fruitSummaryBody = document.getElementById('fruitSummaryBody');
 const fruitDateFrom = document.getElementById('fruitDateFrom');
 const fruitDateTo = document.getElementById('fruitDateTo');
 
-// Fruit View — Nacional
+// Fruit View â€” Nacional
 const fruitNationalSupplier = document.getElementById('fruitNationalSupplier');
 const fruitNationalCrates = document.getElementById('fruitNationalCrates');
 const fruitNationalObs = document.getElementById('fruitNationalObs');
@@ -64,11 +95,6 @@ let currentCoords = null;
 let recordToEditId = null;
 
 // --- HELPERS ---
-function handleDbError(err) {
-    console.error('DB Error:', err);
-    alert('Error de conexión. Verifique su acceso a internet e intente de nuevo.');
-}
-
 function escapeHTML(str) {
     const p = document.createElement('p');
     p.textContent = str;
@@ -88,8 +114,9 @@ function downloadExcel(htmlTable, filename) {
     URL.revokeObjectURL(url);
 }
 
-// --- INICIALIZACIÓN ---
+// --- INICIALIZACIÃ“N ---
 document.addEventListener('DOMContentLoaded', async () => {
+    cleanupOldData();
     initDateFilters();
     checkSession();
     startGpsTracking();
@@ -103,21 +130,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- EVENT LISTENERS ---
 loginUser.addEventListener('change', togglePassVisibility);
-btnLogin.addEventListener('click', handleLogin);
+btnLogin.addEventListener('click', withLoading(btnLogin, 'Ingresando...', handleLogin));
 document.getElementById('btnLogoutWorker').addEventListener('click', logout);
 document.getElementById('btnLogoutAdmin').addEventListener('click', logout);
 
-btnIn.addEventListener('click', () => registerAttendance('Entrada'));
-btnOut.addEventListener('click', () => registerAttendance('Salida'));
+btnIn.addEventListener('click', withLoading(btnIn, 'Registrando...', () => registerAttendance('Entrada')));
+btnOut.addEventListener('click', withLoading(btnOut, 'Registrando...', () => registerAttendance('Salida')));
 
-btnAddWorker.addEventListener('click', addWorker);
-btnSaveSettings.addEventListener('click', saveSettings);
-document.getElementById('btnExport').addEventListener('click', exportAttendanceExcel);
+btnAddWorker.addEventListener('click', withLoading(btnAddWorker, 'Agregando...', addWorker));
+btnSaveSettings.addEventListener('click', withLoading(btnSaveSettings, 'Guardando...', saveSettings));
+document.getElementById('btnExport').addEventListener('click', withLoading(document.getElementById('btnExport'), 'Exportando...', exportAttendanceExcel));
 
 filterDateFrom.addEventListener('change', () => renderAdminDashboard());
 filterDateTo.addEventListener('change', () => renderAdminDashboard());
 
-btnSaveEdit.addEventListener('click', saveEdit);
+btnSaveEdit.addEventListener('click', withLoading(btnSaveEdit, 'Guardando...', saveEdit));
 btnCancelEdit.addEventListener('click', () => {
     editModal.classList.add('hidden');
     recordToEditId = null;
@@ -126,9 +153,9 @@ btnCancelEdit.addEventListener('click', () => {
 // Fruit module event listeners
 document.getElementById('btnFruit').addEventListener('click', showFruitView);
 document.getElementById('btnBackToAdmin').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
-document.getElementById('btnAddFruit').addEventListener('click', addFruitEntry);
-document.getElementById('btnAddNational').addEventListener('click', addNationalEntry);
-document.getElementById('btnExportFruit').addEventListener('click', exportFruitExcel);
+document.getElementById('btnAddFruit').addEventListener('click', withLoading(document.getElementById('btnAddFruit'), 'Agregando...', addFruitEntry));
+document.getElementById('btnAddNational').addEventListener('click', withLoading(document.getElementById('btnAddNational'), 'Agregando...', addNationalEntry));
+document.getElementById('btnExportFruit').addEventListener('click', withLoading(document.getElementById('btnExportFruit'), 'Exportando...', exportFruitExcel));
 
 fruitDateFrom.addEventListener('change', () => renderFruitSummary());
 fruitDateTo.addEventListener('change', () => renderFruitSummary());
@@ -137,7 +164,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => toggleFruitSubView(btn.dataset.tab));
 });
 
-// --- LÓGICA DE LOGIN & SESIÓN ---
+// --- LÃ“GICA DE LOGIN & SESIÃ“N ---
 
 function initDateFilters() {
     const today = new Date().toISOString().split('T')[0];
@@ -167,7 +194,7 @@ async function handleLogin() {
                 showView('admin');
                 await renderAdminDashboard();
             } else {
-                alert('Contraseña incorrecta');
+                alert('ContraseÃ±a incorrecta');
             }
         } catch (err) {
             handleDbError(err);
@@ -215,7 +242,7 @@ function showView(viewKey) {
     views[viewKey].classList.remove('hidden');
 }
 
-// --- LÓGICA DE CONFIGURACIÓN ---
+// --- LÃ“GICA DE CONFIGURACIÃ“N ---
 
 async function loadSettings() {
     try {
@@ -237,7 +264,7 @@ async function saveSettings() {
     }
 }
 
-// --- LÓGICA GPS ---
+// --- LÃ“GICA GPS ---
 
 function startGpsTracking() {
     if (!navigator.geolocation) {
@@ -247,30 +274,30 @@ function startGpsTracking() {
     navigator.geolocation.watchPosition(
         (pos) => {
             currentCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-            gpsStatus.textContent = `📍 Ubicación OK (Precisión: ${Math.round(pos.coords.accuracy)}m)`;
+            gpsStatus.textContent = `ðŸ“ UbicaciÃ³n OK (PrecisiÃ³n: ${Math.round(pos.coords.accuracy)}m)`;
             gpsStatus.classList.add('bg-success');
         },
         (err) => {
-            gpsStatus.textContent = "⚠️ Error GPS: " + err.message;
+            gpsStatus.textContent = "âš ï¸ Error GPS: " + err.message;
             gpsStatus.classList.add('bg-danger');
         },
         { enableHighAccuracy: true }
     );
 }
 
-// --- LÓGICA DE ASISTENCIA ---
+// --- LÃ“GICA DE ASISTENCIA ---
 
 async function registerAttendance(type) {
-    if (!currentCoords) return alert("Esperando señal GPS...");
+    if (!currentCoords) return alert("Esperando seÃ±al GPS...");
 
     const now = new Date();
-    const today = now.toLocaleDateString();
+    const today = todayStr();
 
     try {
         const records = await SupabaseDB.getRecords();
         const existing = records.find(r => r.worker === currentUser.name && r.date === today && r.type === type);
         if (existing) {
-            return alert(`Ya ha registrado su ${type} el día de hoy (${existing.time}).`);
+            return alert(`Ya ha registrado su ${type} el dÃ­a de hoy (${existing.time}).`);
         }
 
         const settings = await SupabaseDB.getSettings();
@@ -280,7 +307,7 @@ async function registerAttendance(type) {
             worker: currentUser.name,
             type: type,
             date: today,
-            time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time: timeStr(),
             lat: currentCoords.lat,
             lon: currentCoords.lon,
             status: status,
@@ -290,7 +317,7 @@ async function registerAttendance(type) {
         };
 
         await SupabaseDB.addRecord(record);
-        alert(`✅ ${type} registrada: ${status} ${extra}`);
+        alert(`âœ… ${type} registrada: ${status} ${extra}`);
         await renderWorkerDashboard();
     } catch (err) {
         handleDbError(err);
@@ -338,7 +365,7 @@ function calculateStatus(type, timeObj, settings) {
     return [statusBadge, extraInfo, diffMinsTotal];
 }
 
-// --- LÓGICA DE EDICIÓN (ADMIN) ---
+// --- LÃ“GICA DE EDICIÃ“N (ADMIN) ---
 
 window.openEditModal = async function(id) {
     try {
@@ -360,7 +387,7 @@ async function saveEdit() {
     const newTime = editTime.value;
     const observation = editObservation.value.trim();
 
-    if (!newTime) return alert('Seleccione una hora válida');
+    if (!newTime) return alert('Seleccione una hora vÃ¡lida');
     if (!observation) return alert('El justificativo es obligatorio');
 
     try {
@@ -411,7 +438,7 @@ async function renderWorkerDashboard() {
     workerNameDisplay.textContent = currentUser.name;
     try {
         const records = await SupabaseDB.getRecords();
-        const today = new Date().toLocaleDateString();
+        const today = todayStr();
         const filtered = records.filter(r => r.worker === currentUser.name && r.date === today);
         
         workerAttendanceBody.innerHTML = filtered.map(r => `
@@ -453,7 +480,7 @@ async function renderAdminDashboard() {
                     <span class="badge ${getStatusClass(r.status)}">${r.status}</span>
                     <div style="font-size: 0.7rem">${r.extra}</div>
                 </td>
-                <td><a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">📍 Ver</a></td>
+                <td><a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">ðŸ“ Ver</a></td>
                 <td><small>${escapeHTML(r.observation || '-')}</small></td>
                 <td>
                     <button class="btn btn-edit-sm" onclick="openEditModal(${r.id})">Editar</button>
@@ -493,7 +520,7 @@ async function renderWorkerList() {
 }
 
 window.deleteWorker = async function(id) {
-    if (!confirm('¿Seguro que desea eliminar a este trabajador?')) return;
+    if (!confirm('Â¿Seguro que desea eliminar a este trabajador?')) return;
     try {
         await SupabaseDB.deleteWorker(id);
         await renderWorkerList();
@@ -539,7 +566,7 @@ async function exportAttendanceExcel() {
     }
 }
 
-// --- LÓGICA DE ENVÍO DE FRUTA ---
+// --- LÃ“GICA DE ENVÃO DE FRUTA ---
 
 function showFruitView() {
     showView('fruit');
@@ -573,7 +600,7 @@ async function addNationalEntry() {
     const supplier = fruitNationalSupplier.value.trim();
     const crates = parseInt(fruitNationalCrates.value, 10);
     if (!supplier) return alert('Ingrese el nombre del proveedor');
-    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
+    if (!crates || crates < 1) return alert('Ingrese una cantidad vÃ¡lida de gavetas');
 
     const now = new Date();
     const record = {
@@ -581,14 +608,13 @@ async function addNationalEntry() {
         supplier: supplier,
         crates: crates,
         weight: 0,
-        date: now.toLocaleDateString(),
-        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: todayStr(),
+        time: timeStr(),
         observation: fruitNationalObs.value.trim()
     };
 
     try {
         await SupabaseDB.addFruitRecord(record);
-        fruitNationalSupplier.value = '';
         fruitNationalCrates.value = '5';
         fruitNationalObs.value = '';
         await renderNationalEntries();
@@ -599,7 +625,7 @@ async function addNationalEntry() {
 }
 
 window.deleteNationalEntry = async function(id) {
-    if (!confirm('¿Eliminar este registro?')) return;
+    if (!confirm('Â¿Eliminar este registro?')) return;
     try {
         await SupabaseDB.deleteFruitRecord(id);
         await renderNationalEntries();
@@ -611,7 +637,7 @@ window.deleteNationalEntry = async function(id) {
 async function renderNationalEntries() {
     try {
         const records = await SupabaseDB.getFruitRecords();
-        const today = new Date().toLocaleDateString();
+        const today = todayStr();
         const national = records.filter(r => r.date === today && r.type === 'Nacional');
         const totalCrates = national.reduce((s, r) => s + r.crates, 0);
 
@@ -631,7 +657,7 @@ async function renderNationalEntries() {
     }
 }
 
-// --- Exportación ---
+// --- ExportaciÃ³n ---
 
 async function addFruitEntry() {
     const supplier = fruitSupplier.value.trim();
@@ -639,23 +665,22 @@ async function addFruitEntry() {
     const weight = parseFloat(fruitWeight.value);
 
     if (!supplier) return alert('Ingrese el nombre del proveedor');
-    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
+    if (!crates || crates < 1) return alert('Ingrese una cantidad vÃ¡lida de gavetas');
     if (!weight || weight <= 0) return alert('Ingrese el peso');
 
     const now = new Date();
     const record = {
-        type: 'Exportación',
+        type: 'ExportaciÃ³n',
         supplier: supplier,
         crates: crates,
         weight: weight,
-        date: now.toLocaleDateString(),
-        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: todayStr(),
+        time: timeStr(),
         observation: fruitObs.value.trim()
     };
 
     try {
         await SupabaseDB.addFruitRecord(record);
-        fruitSupplier.value = '';
         fruitCrates.value = '5';
         fruitWeight.value = '';
         fruitObs.value = '';
@@ -667,7 +692,7 @@ async function addFruitEntry() {
 }
 
 window.deleteFruitEntry = async function(id) {
-    if (!confirm('¿Eliminar este registro?')) return;
+    if (!confirm('Â¿Eliminar este registro?')) return;
     try {
         await SupabaseDB.deleteFruitRecord(id);
         await renderExportEntries();
@@ -679,8 +704,8 @@ window.deleteFruitEntry = async function(id) {
 async function renderExportEntries() {
     try {
         const records = await SupabaseDB.getFruitRecords();
-        const today = new Date().toLocaleDateString();
-        const exports = records.filter(r => r.date === today && r.type === 'Exportación');
+        const today = todayStr();
+        const exports = records.filter(r => r.date === today && r.type === 'ExportaciÃ³n');
 
         const totalCrates = exports.reduce((s, r) => s + r.crates, 0);
         const totalWeight = exports.reduce((s, r) => s + r.weight, 0);
@@ -763,9 +788,9 @@ async function renderFruitSummary() {
             html += `<tr class="summary-date-row"><td colspan="5"><strong>${date}</strong></td></tr>`;
 
             entries.forEach(e => {
-                const nacDisplay = e.nacCrates > 0 ? e.nacCrates : '—';
-                const expDisplay = e.expCrates > 0 ? e.expCrates : '—';
-                const weightDisplay = e.weight > 0 ? e.weight.toFixed(1) : '—';
+                const nacDisplay = e.nacCrates > 0 ? e.nacCrates : 'â€”';
+                const expDisplay = e.expCrates > 0 ? e.expCrates : 'â€”';
+                const weightDisplay = e.weight > 0 ? e.weight.toFixed(1) : 'â€”';
                 html += `<tr>
                     <td>${e.nacCrates > 0 ? '<span class="badge bg-info">Nac.</span>' : ''}${e.expCrates > 0 ? '<span class="badge bg-success">Exp.</span>' : ''}</td>
                     <td>${escapeHTML(e.supplier)}</td>
@@ -781,9 +806,9 @@ async function renderFruitSummary() {
             html += `<tr class="summary-date-subtotal">
                 <td><em>Subtotal ${date}</em></td>
                 <td></td>
-                <td>${dateNacCrates > 0 ? dateNacCrates : '—'}</td>
-                <td>${dateExpCrates > 0 ? dateExpCrates : '—'}</td>
-                <td>${dateWeight > 0 ? dateWeight.toFixed(1) : '—'}</td>
+                <td>${dateNacCrates > 0 ? dateNacCrates : 'â€”'}</td>
+                <td>${dateExpCrates > 0 ? dateExpCrates : 'â€”'}</td>
+                <td>${dateWeight > 0 ? dateWeight.toFixed(1) : 'â€”'}</td>
             </tr>`;
 
             totalNacCrates += dateNacCrates;
@@ -855,7 +880,7 @@ async function exportFruitExcel() {
 
             entries.forEach(e => {
                 html += `<tr><td>${date}</td>`;
-                html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'Exportación' : ''}</td>`;
+                html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'ExportaciÃ³n' : ''}</td>`;
                 html += `<td>${escapeHTML(e.supplier)}</td>`;
                 html += `<td>${e.nacCrates > 0 ? e.nacCrates : ''}</td>`;
                 html += `<td>${e.expCrates > 0 ? e.expCrates : ''}</td>`;
