@@ -1,73 +1,47 @@
-# React + TypeScript + Vite
+# Asistencia FSS - Control de Asistencia Local
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Asistencia FSS** es una aplicación web ligera y local diseñada para el registro de asistencia de personal. Prioriza la simplicidad, la usabilidad móvil y la privacidad de los datos al almacenar todos los registros localmente en el navegador.
 
-Currently, two official plugins are available:
+## 🚀 Características Principales
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Registro con GPS**: Captura automáticamente la ubicación (latitud, longitud y precisión) en cada registro.
+- **Cálculo Automático**: Determina atrasos y horas extras basados en horarios configurables.
+- **Panel de Administración**: 
+  - Gestión de trabajadores (Alta/Baja).
+  - Configuración de horarios de entrada y salida esperados.
+  - Visualización y filtrado de registros por fecha.
+  - Edición de registros con justificativo obligatorio.
+  - Exportación de datos a formato CSV.
+- **100% Local**: No requiere base de datos ni servidor; utiliza `localStorage` del navegador.
+- **Diseño Mobile-First**: Optimizado para ser utilizado cómodamente desde teléfonos móviles.
 
-## React Compiler
+## 🛠️ Tecnologías
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **HTML5**: Estructura semántica.
+- **CSS3**: Diseño responsivo y moderno mediante variables CSS.
+- **Vanilla JavaScript**: Lógica central, API de Geolocalización y gestión de persistencia.
 
-## Expanding the ESLint configuration
+## 📋 Requisitos y Uso
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Entorno Seguro**: Debido al uso de la API de Geolocalización, la aplicación debe ejecutarse bajo `HTTPS` o en `localhost`.
+2. **Sin Construcción**: No requiere comandos de instalación ni procesos de compilación. Simplemente abre `index.html` en un navegador moderno.
+3. **Servidor Estático (Opcional)**:
+   ```bash
+   npx serve .
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🔐 Acceso
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Trabajadores**: Seleccionan su nombre del listado desplegable.
+- **Administrador**: Seleccionar "Administrador" e ingresar la contraseña por defecto (`123`).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 💾 Estructura de Datos
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Los datos se almacenan en el `localStorage` bajo las siguientes claves:
+- `attendance_records_v3`: Historial de entradas y salidas.
+- `attendance_workers_v3`: Lista de trabajadores registrados.
+- `attendance_settings_v3`: Configuración de horarios globales.
+- `attendance_session_v3`: Estado de la sesión actual.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+Desarrollado para ser una solución rápida, eficiente y sin dependencias externas.
