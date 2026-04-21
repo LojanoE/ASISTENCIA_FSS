@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia FSS - Control de Horarios</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- VISTA: LOGIN -->
+        <section id="view-login" class="view">
+            <header>
+                <h1>Asistencia FSS</h1>
+                <p>Seleccione su nombre para continuar</p>
+            </header>
+            <div class="card">
+                <div class="form-group">
+                    <label for="loginUser">Nombre de Usuario</label>
+                    <select id="loginUser">
+                        <option value="">-- Seleccione --</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <div id="passContainer" class="form-group hidden">
+                    <label for="loginPass">Contraseña de Administrador</label>
+                    <input type="password" id="loginPass" placeholder="Ingrese 123">
+                </div>
+                <button id="btnLogin" class="btn btn-primary w-full">Ingresar</button>
+            </div>
+        </section>
+
+        <!-- VISTA: TRABAJADOR (REGISTRO) -->
+        <section id="view-worker" class="view hidden">
+            <header>
+                <div class="header-flex">
+                    <h1>Hola, <span id="workerNameDisplay"></span></h1>
+                    <button id="btnLogoutWorker" class="btn btn-outline-sm">Salir</button>
+                </div>
+                <p>Registre su asistencia (Una vez por evento al día)</p>
+            </header>
+            
+            <div class="worker-layout">
+                <div class="card text-center">
+                    <div id="gpsStatus" class="status-msg">Esperando señal GPS...</div>
+                    <div class="button-group-vertical">
+                        <button id="btnIn" class="btn btn-primary btn-lg">REGISTRAR ENTRADA</button>
+                        <button id="btnOut" class="btn btn-secondary btn-lg">REGISTRAR SALIDA</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Mis Registros de Hoy</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Evento</th>
+                                    <th>Hora</th>
+                                    <th>Estado / Extras</th>
+                                    <th>Observación</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workerAttendanceBody">
+                                <!-- Solo lectura -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA: ADMIN -->
+        <section id="view-admin" class="view hidden">
+            <header>
+                <div class="header-flex">
+                    <h1>Panel Administrador</h1>
+                    <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
+                </div>
+            </header>
+
+            <div class="admin-grid">
+                <!-- Configuración de Horarios Globales -->
+                <section class="card">
+                    <h2>Configuración de Horarios</h2>
+                    <div class="form-group">
+                        <label>Hora de Entrada Esperada</label>
+                        <input type="time" id="configEntryTime" value="08:00">
+                    </div>
+                    <div class="form-group">
+                        <label>Hora de Salida Esperada</label>
+                        <input type="time" id="configExitTime" value="17:00">
+                    </div>
+                    <button id="btnSaveSettings" class="btn btn-primary w-full">Guardar Horarios</button>
+                </section>
+
+                <!-- Gestión de Trabajadores -->
+                <section class="card">
+                    <h2>Gestionar Trabajadores</h2>
+                    <div class="form-group">
+                        <label for="newWorkerName">Nuevo Trabajador</label>
+                        <input type="text" id="newWorkerName" placeholder="Nombre completo">
+                    </div>
+                    <button id="btnAddWorker" class="btn btn-primary w-full" style="margin-bottom: 1.5rem;">Añadir Trabajador</button>
+                    <ul id="workerList" class="list-group"></ul>
+                </section>
+
+                <!-- Historial Completo -->
+                <section class="card full-width">
+                    <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <h2>Historial de Asistencia</h2>
+                        <div class="form-inline" style="margin-bottom: 0;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Desde:</label>
+                                <input type="date" id="filterDateFrom" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Hasta:</label>
+                                <input type="date" id="filterDateTo" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                        <button id="btnExport" class="btn btn-outline">Exportar CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Trabajador</th>
+                                    <th>Tipo</th>
+                                    <th>Fecha</th>
+                                    <th>Hora</th>
+                                    <th>Estado</th>
+                                    <th>Ubicación</th>
+                                    <th>Observación</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminAttendanceBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </div>
+
+    <!-- MODAL DE EDICIÓN (ADMIN) -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content card">
+            <h2>Editar Registro</h2>
+            <div class="form-group">
+                <label for="editTime">Nueva Hora</label>
+                <input type="time" id="editTime">
+            </div>
+            <div class="form-group">
+                <label for="editObservation">Justificativo (Obligatorio)</label>
+                <textarea id="editObservation" rows="3" placeholder="Ej: Error en el registro manual..."></textarea>
+            </div>
+            <div class="button-group-vertical">
+                <button id="btnSaveEdit" class="btn btn-primary">Guardar Cambios</button>
+                <button id="btnCancelEdit" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
