@@ -460,6 +460,10 @@ async function renderWorkerDashboard() {
         const records = await SupabaseDB.getRecords();
         const today = todayStr();
         const filtered = records.filter(r => r.worker === currentUser.name && r.date === today);
+        const hasEntrada = filtered.some(r => r.type === 'Entrada');
+        const hasSalida = filtered.some(r => r.type === 'Salida');
+        btnIn.disabled = hasEntrada;
+        btnOut.disabled = hasSalida;
         
         workerAttendanceBody.innerHTML = filtered.map(r => `
             <tr>

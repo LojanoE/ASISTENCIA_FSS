@@ -121,6 +121,12 @@ h2 {
     transform: scale(0.98);
 }
 
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-primary { background: var(--primary-color); color: white; }
 .btn-secondary { background: var(--secondary-color); color: white; }
 .btn-outline-sm { 
