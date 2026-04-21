@@ -24,7 +24,7 @@
                 </div>
                 <div id="passContainer" class="form-group hidden">
                     <label for="loginPass">Contraseña de Administrador</label>
-                    <input type="password" id="loginPass" placeholder="Ingrese 123">
+                    <input type="password" id="loginPass" placeholder="Contraseña">
                 </div>
                 <button id="btnLogin" class="btn btn-primary w-full">Ingresar</button>
             </div>
@@ -160,6 +160,8 @@
                 <button class="tab-btn" data-tab="fruit-summary">Resumen</button>
             </div>
 
+            <datalist id="supplierList"></datalist>
+
             <!-- TAB: Nacional -->
             <div id="fruit-national" class="tab-content">
                 <div class="card">
@@ -206,7 +208,6 @@
                     <div class="form-group">
                         <label for="fruitSupplier">Proveedor</label>
                         <input type="text" id="fruitSupplier" placeholder="Nombre del proveedor" list="supplierList">
-                        <datalist id="supplierList"></datalist>
                     </div>
                     <div class="fruit-row">
                         <div class="form-group">
@@ -300,6 +301,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
