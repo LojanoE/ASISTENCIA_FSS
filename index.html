@@ -142,6 +142,37 @@
                         </table>
                     </div>
                 </section>
+
+                <!-- Calendario de Asistencia -->
+                <section class="card full-width">
+                    <h2>Calendario de Asistencia</h2>
+                    <div class="calendar-controls">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="calendarWorker">Trabajador</label>
+                            <select id="calendarWorker"></select>
+                        </div>
+                        <div class="calendar-nav">
+                            <button id="btnPrevMonth" class="btn btn-outline-sm">◀</button>
+                            <span id="calendarMonthLabel"></span>
+                            <button id="btnNextMonth" class="btn btn-outline-sm">▶</button>
+                        </div>
+                    </div>
+                    <div class="calendar-legend">
+                        <span class="legend-item"><span class="legend-dot legend-puntual"></span> Puntual</span>
+                        <span class="legend-item"><span class="legend-dot legend-atraso"></span> Atraso</span>
+                        <span class="legend-item"><span class="legend-dot legend-extra"></span> Extra</span>
+                        <span class="legend-item"><span class="legend-dot legend-sin-registro"></span> Sin registro</span>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                        <div class="calendar-header">Lu</div>
+                        <div class="calendar-header">Ma</div>
+                        <div class="calendar-header">Mi</div>
+                        <div class="calendar-header">Ju</div>
+                        <div class="calendar-header">Vi</div>
+                        <div class="calendar-header">Sá</div>
+                        <div class="calendar-header">Do</div>
+                    </div>
+                </section>
             </div>
         </section>
 

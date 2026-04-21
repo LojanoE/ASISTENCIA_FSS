@@ -89,10 +89,17 @@ const fruitNationalObs = document.getElementById('fruitNationalObs');
 const fruitNationalEntriesBody = document.getElementById('fruitNationalEntriesBody');
 const fruitNationalTodaySummary = document.getElementById('fruitNationalTodaySummary');
 
+// Calendar
+const calendarWorker = document.getElementById('calendarWorker');
+const calendarMonthLabel = document.getElementById('calendarMonthLabel');
+const calendarGrid = document.getElementById('calendarGrid');
+
 // --- ESTADO GLOBAL ---
 let currentUser = null;
 let currentCoords = null;
 let recordToEditId = null;
+let calendarYear = new Date().getFullYear();
+let calendarMonth = new Date().getMonth();
 
 // --- HELPERS ---
 function escapeHTML(str) {
@@ -163,6 +170,19 @@ fruitDateTo.addEventListener('change', () => renderFruitSummary());
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => toggleFruitSubView(btn.dataset.tab));
 });
+
+// Calendar event listeners
+document.getElementById('btnPrevMonth').addEventListener('click', () => {
+    calendarMonth--;
+    if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+    renderCalendar();
+});
+document.getElementById('btnNextMonth').addEventListener('click', () => {
+    calendarMonth++;
+    if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+    renderCalendar();
+});
+calendarWorker.addEventListener('change', () => renderCalendar());
 
 // --- LÃ“GICA DE LOGIN & SESIÃ“N ---
 
@@ -459,6 +479,8 @@ async function renderWorkerDashboard() {
 
 async function renderAdminDashboard() {
     await renderWorkerList();
+    await populateCalendarWorkers();
+    renderCalendar();
     try {
         const allRecords = await SupabaseDB.getRecords();
         const from = filterDateFrom.value;
@@ -900,6 +922,111 @@ async function exportFruitExcel() {
         html += '</table>';
 
         downloadExcel(html, `fruta_${from}_al_${to}.xls`);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- CALENDARIO DE ASISTENCIA ---
+
+async function renderCalendar() {
+    const workerName = calendarWorker.value;
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    calendarMonthLabel.textContent = `${monthNames[calendarMonth]} ${calendarYear}`;
+
+    // Remove old day cells (keep headers)
+    const oldDays = calendarGrid.querySelectorAll('.calendar-day');
+    oldDays.forEach(d => d.remove());
+
+    if (!workerName) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-day empty';
+        empty.style.gridColumn = '1 / -1';
+        empty.innerHTML = '<span style="color:var(--text-muted);">Seleccione un trabajador</span>';
+        calendarGrid.appendChild(empty);
+        return;
+    }
+
+    try {
+        const allRecords = await SupabaseDB.getRecords();
+        const workerRecords = allRecords.filter(r => r.worker === workerName);
+
+        // Build a map: "DD/MM/YYYY" -> { status, type, extra }
+        const recordMap = {};
+        workerRecords.forEach(r => {
+            if (!recordMap[r.date]) recordMap[r.date] = [];
+            recordMap[r.date].push({ type: r.type, status: r.status, extra: r.extra });
+        });
+
+        const firstDay = new Date(calendarYear, calendarMonth, 1);
+        const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+        let startDow = firstDay.getDay(); // 0=Sun
+        startDow = startDow === 0 ? 6 : startDow - 1; // convert to Mon=0
+
+        // Empty cells before first day
+        for (let i = 0; i < startDow; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'calendar-day empty';
+            calendarGrid.appendChild(empty);
+        }
+
+        // Day cells
+        const today = todayStr();
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dayStr = `${String(d).padStart(2, '0')}/${String(calendarMonth + 1).padStart(2, '0')}/${calendarYear}`;
+            const cell = document.createElement('div');
+            cell.className = 'calendar-day';
+
+            const entries = recordMap[dayStr] || [];
+
+            if (entries.length === 0) {
+                cell.classList.add('sin-registro');
+                cell.innerHTML = `<span class="day-num">${d}</span>`;
+            } else {
+                // Determine overall status: worst wins (Atraso > Extra > Puntual/Normal)
+                let hasEntry = entries.some(e => e.type === 'Entrada');
+                let hasAtraso = entries.some(e => e.status === 'Atraso');
+                let hasExtra = entries.some(e => e.status === 'Extra');
+                let isPuntual = entries.some(e => e.status === 'Puntual');
+                let isNormal = entries.some(e => e.status === 'Normal');
+
+                let statusClass = 'sin-registro';
+                let statusText = '';
+
+                if (hasAtraso) {
+                    statusClass = 'atraso';
+                    statusText = 'Atraso';
+                } else if (hasExtra && !isPuntual) {
+                    statusClass = 'extra';
+                    statusText = 'Extra';
+                } else if (isPuntual) {
+                    statusClass = 'puntual';
+                    statusText = 'Puntual';
+                    if (hasExtra) statusText = 'Puntual + Extra';
+                } else if (isNormal) {
+                    statusClass = 'extra';
+                    statusText = 'Normal + Extra';
+                } else if (hasExtra) {
+                    statusClass = 'extra';
+                    statusText = 'Extra';
+                }
+
+                cell.classList.add(statusClass);
+                cell.innerHTML = `<span class="day-num">${d}</span>${statusText ? `<span class="day-badge">${statusText}</span>` : ''}`;
+            }
+
+            calendarGrid.appendChild(cell);
+        }
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function populateCalendarWorkers() {
+    try {
+        const workers = await SupabaseDB.getWorkers();
+        calendarWorker.innerHTML = '<option value="">-- Seleccione --</option>' +
+            workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('');
     } catch (err) {
         handleDbError(err);
     }
