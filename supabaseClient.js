@@ -61,7 +61,14 @@ const SupabaseDB = {
             observation: record.observation || ''
         };
         const { data, error } = await _supabase.from('attendance_records').insert(row).select().single();
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23505') {
+                const dupError = new Error('Ya existe un registro de ' + record.type + ' para este trabajador hoy');
+                dupError.code = '23505';
+                throw dupError;
+            }
+            throw error;
+        }
         return data.id;
     },
     async updateRecord(id, updates) {

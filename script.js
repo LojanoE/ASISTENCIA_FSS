@@ -4,7 +4,14 @@ const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_
 
 // --- HELPERS ---
 function todayStr() {
-    return new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function displayDate(dateStr) {
+    if (!dateStr || !dateStr.includes('-')) return dateStr;
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
 }
 
 function timeStr() {
@@ -13,14 +20,13 @@ function timeStr() {
 
 function withLoading(btn, text, fn) {
     return async function() {
-        const original = btn.textContent;
+        const originalText = btn.textContent;
         btn.disabled = true;
         btn.textContent = text;
         try {
             await fn();
         } finally {
-            btn.disabled = false;
-            btn.textContent = original;
+            btn.textContent = originalText;
         }
     };
 }
@@ -308,7 +314,10 @@ function startGpsTracking() {
 // --- LÓGICA DE ASISTENCIA ---
 
 async function registerAttendance(type) {
-    if (!currentCoords) return alert("Esperando señal GPS...");
+    if (!currentCoords) {
+        await renderWorkerDashboard();
+        return alert("Esperando señal GPS...");
+    }
 
     const now = new Date();
     const today = todayStr();
@@ -317,6 +326,7 @@ async function registerAttendance(type) {
         const records = await SupabaseDB.getRecords();
         const existing = records.find(r => r.worker === currentUser.name && r.date === today && r.type === type);
         if (existing) {
+            await renderWorkerDashboard();
             return alert(`Ya ha registrado su ${type} el día de hoy (${existing.time}).`);
         }
 
@@ -340,7 +350,13 @@ async function registerAttendance(type) {
         alert(`✅ ${type} registrada: ${status} ${extra}`);
         await renderWorkerDashboard();
     } catch (err) {
-        handleDbError(err);
+        if (err && err.code === '23505') {
+            alert(`Ya existe un registro de ${type} para hoy. Sincronizando...`);
+            await renderWorkerDashboard();
+        } else {
+            handleDbError(err);
+            await renderWorkerDashboard();
+        }
     }
 }
 
@@ -416,7 +432,7 @@ async function saveEdit() {
         if (!record) return;
 
         const settings = await SupabaseDB.getSettings();
-        const [day, month, year] = record.date.split('/');
+        const [day, month, year] = record.date.split('-');
         const [h, m] = newTime.split(':');
         const newDateObj = new Date(year, month - 1, day, h, m);
 
@@ -491,16 +507,14 @@ async function renderAdminDashboard() {
         const to = filterDateTo.value;
 
         const filteredRecords = allRecords.filter(r => {
-            const [d, m, y] = r.date.split('/');
-            const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            return recordDate >= from && recordDate <= to;
+            return r.date >= from && r.date <= to;
         });
 
         adminAttendanceBody.innerHTML = filteredRecords.map(r => `
             <tr>
                 <td><strong>${escapeHTML(r.worker)}</strong></td>
                 <td>${r.type}</td>
-                <td>${r.date}</td>
+                <td>${displayDate(r.date)}</td>
                 <td>${r.time}</td>
                 <td>
                     <span class="badge ${getStatusClass(r.status)}">${r.status}</span>
@@ -572,9 +586,7 @@ async function exportAttendanceExcel() {
         const to = filterDateTo.value;
 
         const filteredRecords = allRecords.filter(r => {
-            const [d, m, y] = r.date.split('/');
-            const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            return recordDate >= from && recordDate <= to;
+            return r.date >= from && r.date <= to;
         });
 
         if (filteredRecords.length === 0) return alert('No hay registros para exportar en este rango');
@@ -582,7 +594,7 @@ async function exportAttendanceExcel() {
         let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
         html += '<tr style="background-color:#2563eb;color:white;font-weight:bold;"><td>Trabajador</td><td>Tipo</td><td>Fecha</td><td>Hora</td><td>Estado</td><td>Detalles</td><td>Min. Diferencia</td><td>Lat</td><td>Lon</td><td>Observacion</td></tr>';
         filteredRecords.forEach(r => {
-            html += `<tr><td>${escapeHTML(r.worker)}</td><td>${r.type}</td><td>${r.date}</td><td>${r.time}</td><td>${r.status}</td><td>${escapeHTML(r.extra || '')}</td><td>${r.diffMins || 0}</td><td>${r.lat}</td><td>${r.lon}</td><td>${escapeHTML(r.observation || '')}</td></tr>`;
+            html += `<tr><td>${escapeHTML(r.worker)}</td><td>${r.type}</td><td>${displayDate(r.date)}</td><td>${r.time}</td><td>${r.status}</td><td>${escapeHTML(r.extra || '')}</td><td>${r.diffMins || 0}</td><td>${r.lat}</td><td>${r.lon}</td><td>${escapeHTML(r.observation || '')}</td></tr>`;
         });
         html += '</table>';
 
@@ -771,9 +783,7 @@ async function renderFruitSummary() {
         const to = fruitDateTo.value;
 
         const filtered = allRecords.filter(r => {
-            const [d, m, y] = r.date.split('/');
-            const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            return recordDate >= from && recordDate <= to;
+            return r.date >= from && r.date <= to;
         });
 
         if (filtered.length === 0) {
@@ -798,11 +808,7 @@ async function renderFruitSummary() {
             }
         });
 
-        const sortedDates = Object.keys(byDate).sort((a, b) => {
-            const [da, ma, ya] = a.split('/');
-            const [db, mb, yb] = b.split('/');
-            return `${ya}-${ma.padStart(2,'0')}-${da.padStart(2,'0')}`.localeCompare(`${yb}-${mb.padStart(2,'0')}-${db.padStart(2,'0')}`);
-        });
+        const sortedDates = Object.keys(byDate).sort();
 
         let totalNacCrates = 0, totalExpCrates = 0, totalWeight = 0;
         let html = '';
@@ -811,7 +817,7 @@ async function renderFruitSummary() {
             const entries = Object.values(byDate[date]);
             let dateNacCrates = 0, dateExpCrates = 0, dateWeight = 0;
 
-            html += `<tr class="summary-date-row"><td colspan="5"><strong>${date}</strong></td></tr>`;
+            html += `<tr class="summary-date-row"><td colspan="5"><strong>${displayDate(date)}</strong></td></tr>`;
 
             entries.forEach(e => {
                 const nacDisplay = e.nacCrates > 0 ? e.nacCrates : '—';
@@ -830,7 +836,7 @@ async function renderFruitSummary() {
             });
 
             html += `<tr class="summary-date-subtotal">
-                <td><em>Subtotal ${date}</em></td>
+                <td><em>Subtotal ${displayDate(date)}</em></td>
                 <td></td>
                 <td>${dateNacCrates > 0 ? dateNacCrates : '—'}</td>
                 <td>${dateExpCrates > 0 ? dateExpCrates : '—'}</td>
@@ -863,9 +869,7 @@ async function exportFruitExcel() {
         const to = fruitDateTo.value;
 
         const filtered = allRecords.filter(r => {
-            const [d, m, y] = r.date.split('/');
-            const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            return recordDate >= from && recordDate <= to;
+            return r.date >= from && r.date <= to;
         });
 
         if (filtered.length === 0) return alert('No hay registros para exportar en este rango');
@@ -885,11 +889,7 @@ async function exportFruitExcel() {
             }
         });
 
-        const sortedDates = Object.keys(byDate).sort((a, b) => {
-            const [da, ma, ya] = a.split('/');
-            const [db, mb, yb] = b.split('/');
-            return `${ya}-${ma.padStart(2,'0')}-${da.padStart(2,'0')}`.localeCompare(`${yb}-${mb.padStart(2,'0')}-${db.padStart(2,'0')}`);
-        });
+        const sortedDates = Object.keys(byDate).sort();
 
         const hdrStyle = 'style="background-color:#2563eb;color:white;font-weight:bold;"';
         const subStyle = 'style="background-color:#dbeafe;font-weight:bold;"';
@@ -905,7 +905,7 @@ async function exportFruitExcel() {
             let dateNac = 0, dateExp = 0, dateW = 0;
 
             entries.forEach(e => {
-                html += `<tr><td>${date}</td>`;
+                html += `<tr><td>${displayDate(date)}</td>`;
                 html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'Exportación' : ''}</td>`;
                 html += `<td>${escapeHTML(e.supplier)}</td>`;
                 html += `<td>${e.nacCrates > 0 ? e.nacCrates : ''}</td>`;
@@ -916,7 +916,7 @@ async function exportFruitExcel() {
                 dateW += e.weight;
             });
 
-            html += `<tr ${subStyle}><td colspan="3">Subtotal ${date}</td><td>${dateNac}</td><td>${dateExp}</td><td>${dateW.toFixed(1)}</td></tr>`;
+            html += `<tr ${subStyle}><td colspan="3">Subtotal ${displayDate(date)}</td><td>${dateNac}</td><td>${dateExp}</td><td>${dateW.toFixed(1)}</td></tr>`;
             grandNac += dateNac;
             grandExp += dateExp;
             grandWeight += dateW;
@@ -955,7 +955,7 @@ async function renderCalendar() {
         const allRecords = await SupabaseDB.getRecords();
         const workerRecords = allRecords.filter(r => r.worker === workerName);
 
-        // Build a map: "DD/MM/YYYY" -> { status, type, extra }
+        // Build a map: "YYYY-MM-DD" -> { status, type, extra }
         const recordMap = {};
         workerRecords.forEach(r => {
             if (!recordMap[r.date]) recordMap[r.date] = [];
@@ -977,7 +977,7 @@ async function renderCalendar() {
         // Day cells
         const today = todayStr();
         for (let d = 1; d <= daysInMonth; d++) {
-            const dayStr = `${String(d).padStart(2, '0')}/${String(calendarMonth + 1).padStart(2, '0')}/${calendarYear}`;
+            const dayStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const cell = document.createElement('div');
             cell.className = 'calendar-day';
 
