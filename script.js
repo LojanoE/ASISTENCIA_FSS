@@ -3,7 +3,8 @@ const STORAGE_KEYS = {
     RECORDS: 'attendance_records_v3',
     WORKERS: 'attendance_workers_v3',
     SESSION: 'attendance_session_v3',
-    SETTINGS: 'attendance_settings_v3'
+    SETTINGS: 'attendance_settings_v3',
+    FRUIT: 'attendance_fruit_v3'
 };
 
 const ADMIN_CREDENTIALS = { user: 'admin', pass: '123' };
@@ -12,7 +13,8 @@ const ADMIN_CREDENTIALS = { user: 'admin', pass: '123' };
 const views = {
     login: document.getElementById('view-login'),
     worker: document.getElementById('view-worker'),
-    admin: document.getElementById('view-admin')
+    admin: document.getElementById('view-admin'),
+    fruit: document.getElementById('view-fruit')
 };
 
 // Login
@@ -45,6 +47,17 @@ const editTime = document.getElementById('editTime');
 const editObservation = document.getElementById('editObservation');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
+
+// Fruit View
+const fruitSupplier = document.getElementById('fruitSupplier');
+const fruitCrates = document.getElementById('fruitCrates');
+const fruitWeight = document.getElementById('fruitWeight');
+const fruitObs = document.getElementById('fruitObs');
+const fruitEntriesBody = document.getElementById('fruitEntriesBody');
+const fruitTodaySummary = document.getElementById('fruitTodaySummary');
+const fruitSummaryBody = document.getElementById('fruitSummaryBody');
+const fruitDateFrom = document.getElementById('fruitDateFrom');
+const fruitDateTo = document.getElementById('fruitDateTo');
 
 // --- ESTADO GLOBAL ---
 let currentUser = null;
@@ -80,6 +93,19 @@ btnSaveEdit.addEventListener('click', saveEdit);
 btnCancelEdit.addEventListener('click', () => {
     editModal.classList.add('hidden');
     recordToEditId = null;
+});
+
+// Fruit module event listeners
+document.getElementById('btnFruit').addEventListener('click', showFruitView);
+document.getElementById('btnBackToAdmin').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
+document.getElementById('btnAddFruit').addEventListener('click', addFruitEntry);
+document.getElementById('btnExportFruit').addEventListener('click', exportFruitCSV);
+
+fruitDateFrom.addEventListener('change', renderFruitSummary);
+fruitDateTo.addEventListener('change', renderFruitSummary);
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleFruitSubView(btn.dataset.tab));
 });
 
 // --- LÓGICA DE LOGIN & SESIÓN ---
@@ -459,4 +485,203 @@ function escapeHTML(str) {
     const p = document.createElement('p');
     p.textContent = str;
     return p.innerHTML;
+}
+
+// --- LÓGICA DE ENVÍO DE FRUTA ---
+
+function showFruitView() {
+    showView('fruit');
+    toggleFruitSubView('fruit-register');
+    renderFruitEntries();
+    renderSupplierDatalist();
+}
+
+function toggleFruitSubView(tabId) {
+    document.querySelectorAll('#view-fruit .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    document.querySelectorAll('#view-fruit .tab-content').forEach(tc => {
+        tc.classList.toggle('hidden', tc.id !== tabId);
+    });
+    if (tabId === 'fruit-summary') {
+        const today = new Date().toISOString().split('T')[0];
+        fruitDateFrom.value = today;
+        fruitDateTo.value = today;
+        renderFruitSummary();
+    } else {
+        renderFruitEntries();
+    }
+}
+
+function getFruitRecords() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.FRUIT)) || [];
+}
+
+function addFruitEntry() {
+    const supplier = fruitSupplier.value.trim();
+    const crates = parseInt(fruitCrates.value, 10);
+    const weight = parseFloat(fruitWeight.value);
+
+    if (!supplier) return alert('Ingrese el nombre del proveedor');
+    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
+    if (!weight || weight <= 0) return alert('Ingrese el peso');
+
+    const now = new Date();
+    const record = {
+        id: Date.now(),
+        supplier: supplier,
+        crates: crates,
+        weight: weight,
+        date: now.toLocaleDateString(),
+        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        observation: fruitObs.value.trim()
+    };
+
+    const records = getFruitRecords();
+    records.unshift(record);
+    localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
+
+    fruitSupplier.value = '';
+    fruitCrates.value = '5';
+    fruitWeight.value = '';
+    fruitObs.value = '';
+
+    renderFruitEntries();
+    renderSupplierDatalist();
+}
+
+window.deleteFruitEntry = function(id) {
+    if (!confirm('¿Eliminar este registro?')) return;
+    let records = getFruitRecords();
+    records = records.filter(r => r.id !== id);
+    localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
+    renderFruitEntries();
+};
+
+function renderFruitEntries() {
+    const today = new Date().toLocaleDateString();
+    const records = getFruitRecords().filter(r => r.date === today);
+
+    const totalCrates = records.reduce((s, r) => s + r.crates, 0);
+    const totalWeight = records.reduce((s, r) => s + r.weight, 0);
+
+    fruitTodaySummary.innerHTML = `<span class="badge bg-info">Registros: ${records.length}</span> <span class="badge bg-warning">Gavetas: ${totalCrates}</span> <span class="badge bg-success">Peso: ${totalWeight.toFixed(1)} kg</span>`;
+
+    fruitEntriesBody.innerHTML = records.map(r => `
+        <tr>
+            <td><strong>${escapeHTML(r.supplier)}</strong></td>
+            <td>${r.crates}</td>
+            <td>${r.weight}</td>
+            <td>${r.time}</td>
+            <td><button class="btn btn-danger-sm" onclick="deleteFruitEntry(${r.id})">X</button></td>
+        </tr>
+    `).join('') || '<tr><td colspan="5" class="text-center">Sin registros hoy</td></tr>';
+}
+
+function renderSupplierDatalist() {
+    const records = getFruitRecords();
+    const suppliers = [...new Set(records.map(r => r.supplier))];
+    const datalist = document.getElementById('supplierList');
+    datalist.innerHTML = suppliers.map(s => `<option value="${escapeHTML(s)}">`).join('');
+}
+
+function renderFruitSummary() {
+    const from = fruitDateFrom.value;
+    const to = fruitDateTo.value;
+    const allRecords = getFruitRecords();
+
+    const filtered = allRecords.filter(r => {
+        const [d, m, y] = r.date.split('/');
+        const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        return recordDate >= from && recordDate <= to;
+    });
+
+    const byDate = {};
+    filtered.forEach(r => {
+        if (!byDate[r.date]) byDate[r.date] = {};
+        if (!byDate[r.date][r.supplier]) {
+            byDate[r.date][r.supplier] = { count: 0, crates: 0, weight: 0 };
+        }
+        byDate[r.date][r.supplier].count++;
+        byDate[r.date][r.supplier].crates += r.crates;
+        byDate[r.date][r.supplier].weight += r.weight;
+    });
+
+    if (Object.keys(byDate).length === 0) {
+        fruitSummaryBody.innerHTML = '<tr><td colspan="5" class="text-center">Sin registros en este rango</td></tr>';
+        return;
+    }
+
+    const sortedDates = Object.keys(byDate).sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return `${ya}-${ma.padStart(2,'0')}-${da.padStart(2,'0')}`.localeCompare(`${yb}-${mb.padStart(2,'0')}-${db.padStart(2,'0')}`);
+    });
+
+    let totalCount = 0, totalCrates = 0, totalWeight = 0;
+    let html = '';
+
+    sortedDates.forEach(date => {
+        const suppliers = byDate[date];
+        let dateCrates = 0, dateWeight = 0, dateCount = 0;
+
+        const rows = Object.entries(suppliers).map(([name, data]) => {
+            dateCrates += data.crates;
+            dateWeight += data.weight;
+            dateCount += data.count;
+            return `<tr>
+                <td>${escapeHTML(name)}</td>
+                <td>${data.count}</td>
+                <td>${data.crates}</td>
+                <td>${data.weight.toFixed(1)}</td>
+            </tr>`;
+        }).join('');
+
+        html += `<tr class="summary-date-row"><td colspan="4"><strong>${date}</strong></td></tr>`;
+        html += rows;
+        html += `<tr class="summary-date-subtotal">
+            <td><em>Subtotal ${date}</em></td>
+            <td>${dateCount}</td>
+            <td>${dateCrates}</td>
+            <td>${dateWeight.toFixed(1)}</td>
+        </tr>`;
+
+        totalCrates += dateCrates;
+        totalWeight += dateWeight;
+        totalCount += dateCount;
+    });
+
+    html += `<tr class="summary-grand-total">
+        <td><strong>TOTAL</strong></td>
+        <td><strong>${totalCount}</strong></td>
+        <td><strong>${totalCrates}</strong></td>
+        <td><strong>${totalWeight.toFixed(1)}</strong></td>
+    </tr>`;
+
+    fruitSummaryBody.innerHTML = html;
+}
+
+function exportFruitCSV() {
+    const from = fruitDateFrom.value;
+    const to = fruitDateTo.value;
+    const allRecords = getFruitRecords();
+
+    const filtered = allRecords.filter(r => {
+        const [d, m, y] = r.date.split('/');
+        const recordDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        return recordDate >= from && recordDate <= to;
+    });
+
+    if (filtered.length === 0) return alert('No hay registros para exportar en este rango');
+
+    let csv = "Proveedor,Gavetas,Peso_kg,Fecha,Hora,Observacion\n";
+    filtered.forEach(r => {
+        csv += `"${r.supplier}",${r.crates},${r.weight},${r.date},${r.time},"${r.observation || ''}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fruta_${from}_al_${to}.csv`;
+    a.click();
 }

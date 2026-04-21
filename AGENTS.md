@@ -1,7 +1,7 @@
 # AGENTS.md — Asistencia FSS
 
 ## Project Overview
-Vanilla HTML/CSS/JS SPA for attendance tracking with GPS. No build step, no bundler, no framework. All persistence via `localStorage`.
+Vanilla HTML/CSS/JS SPA for attendance tracking with GPS and fruit shipment logging. No build step, no bundler, no framework. All persistence via `localStorage`.
 
 ## Dev Commands
 - Run locally: `npx serve .` or open `index.html` directly in a browser
@@ -11,6 +11,7 @@ Vanilla HTML/CSS/JS SPA for attendance tracking with GPS. No build step, no bund
 ## Architecture
 - **3 files**: `index.html` (views), `style.css` (styling), `script.js` (all logic)
 - **View routing**: `showView(viewKey)` toggles `.hidden` CSS class on `<section>` elements
+- **Sub-view tabs**: Fruit module uses `.tab-btn` / `.tab-content` with `toggleFruitSubView()` — no separate views
 - **Persistence**: `STORAGE_KEYS` constants map to `localStorage` keys with `_v3` suffix
 - **Admin login**: hardcoded in `ADMIN_CREDENTIALS` (`admin`/`123`)
 
@@ -18,8 +19,9 @@ Vanilla HTML/CSS/JS SPA for attendance tracking with GPS. No build step, no bund
 - Always use `STORAGE_KEYS` constants for localStorage access — never hardcode key strings
 - Always escape dynamic HTML with `escapeHTML()` to prevent XSS
 - Use CSS variables from `:root` — don't hardcode colors
-- `openEditModal` and `deleteWorker` are attached to `window` for inline `onclick` — new inline handlers need `window.` assignment too
+- Functions called from inline `onclick` (`openEditModal`, `deleteWorker`, `deleteFruitEntry`) are attached to `window` — new inline handlers need `window.` assignment too
 - Dates use `toLocaleDateString()` format (DD/MM/YYYY); comparison logic converts to YYYY-MM-DD
+- Fruit module: admin-only, accessed via "Envío de Fruta" button in admin header
 
 ## Known Issues
 - `eslint.config.js` references React/TS plugins but source is plain vanilla JS — config won't lint `.js` files

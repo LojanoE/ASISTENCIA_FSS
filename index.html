@@ -75,7 +75,10 @@
             <header>
                 <div class="header-flex">
                     <h1>Panel Administrador</h1>
-                    <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
+                    <div class="header-actions">
+                        <button id="btnFruit" class="btn btn-outline-sm">🧺 Envío de Fruta</button>
+                        <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
+                    </div>
                 </div>
             </header>
 
@@ -139,6 +142,100 @@
                         </table>
                     </div>
                 </section>
+            </div>
+        </section>
+
+        <!-- VISTA: ENVÍO DE FRUTA -->
+        <section id="view-fruit" class="view hidden">
+            <header>
+                <div class="header-flex">
+                    <h1>🧺 Envío de Fruta</h1>
+                    <button id="btnBackToAdmin" class="btn btn-outline-sm">Volver al Panel</button>
+                </div>
+            </header>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="fruit-register">Registro de Campo</button>
+                <button class="tab-btn" data-tab="fruit-summary">Resumen</button>
+            </div>
+
+            <!-- TAB: Registro de Campo -->
+            <div id="fruit-register" class="tab-content">
+                <div class="card">
+                    <h2>Nuevo Registro</h2>
+                    <div class="form-group">
+                        <label for="fruitSupplier">Proveedor</label>
+                        <input type="text" id="fruitSupplier" placeholder="Nombre del proveedor" list="supplierList">
+                        <datalist id="supplierList"></datalist>
+                    </div>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="fruitCrates">Gavetas</label>
+                            <input type="number" id="fruitCrates" value="5" min="1" inputmode="numeric">
+                        </div>
+                        <div class="form-group">
+                            <label for="fruitWeight">Peso (kg)</label>
+                            <input type="number" id="fruitWeight" placeholder="0.0" min="0" step="0.1" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="fruitObs">Observación</label>
+                        <input type="text" id="fruitObs" placeholder="Opcional">
+                    </div>
+                    <button id="btnAddFruit" class="btn btn-primary w-full">Agregar Registro</button>
+                </div>
+
+                <div class="card">
+                    <h2>Registros de Hoy</h2>
+                    <div class="fruit-today-summary" id="fruitTodaySummary"></div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Proveedor</th>
+                                    <th>Gavetas</th>
+                                    <th>Peso (kg)</th>
+                                    <th>Hora</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fruitEntriesBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Resumen -->
+            <div id="fruit-summary" class="tab-content hidden">
+                <div class="card full-width">
+                    <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <h2>Resumen por Proveedor</h2>
+                        <div class="form-inline" style="margin-bottom: 0;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Desde:</label>
+                                <input type="date" id="fruitDateFrom" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Hasta:</label>
+                                <input type="date" id="fruitDateTo" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                        <button id="btnExportFruit" class="btn btn-outline">Exportar CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Proveedor</th>
+                                    <th>Registros</th>
+                                    <th>Gavetas</th>
+                                    <th>Peso (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fruitSummaryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
