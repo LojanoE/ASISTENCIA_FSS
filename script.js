@@ -48,7 +48,7 @@ const editObservation = document.getElementById('editObservation');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
 
-// Fruit View
+// Fruit View — Export
 const fruitSupplier = document.getElementById('fruitSupplier');
 const fruitCrates = document.getElementById('fruitCrates');
 const fruitWeight = document.getElementById('fruitWeight');
@@ -58,6 +58,12 @@ const fruitTodaySummary = document.getElementById('fruitTodaySummary');
 const fruitSummaryBody = document.getElementById('fruitSummaryBody');
 const fruitDateFrom = document.getElementById('fruitDateFrom');
 const fruitDateTo = document.getElementById('fruitDateTo');
+
+// Fruit View — Nacional
+const fruitNationalCrates = document.getElementById('fruitNationalCrates');
+const fruitNationalObs = document.getElementById('fruitNationalObs');
+const fruitNationalEntriesBody = document.getElementById('fruitNationalEntriesBody');
+const fruitNationalTodaySummary = document.getElementById('fruitNationalTodaySummary');
 
 // --- ESTADO GLOBAL ---
 let currentUser = null;
@@ -99,6 +105,7 @@ btnCancelEdit.addEventListener('click', () => {
 document.getElementById('btnFruit').addEventListener('click', showFruitView);
 document.getElementById('btnBackToAdmin').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
 document.getElementById('btnAddFruit').addEventListener('click', addFruitEntry);
+document.getElementById('btnAddNational').addEventListener('click', addNationalEntry);
 document.getElementById('btnExportFruit').addEventListener('click', exportFruitCSV);
 
 fruitDateFrom.addEventListener('change', renderFruitSummary);
@@ -491,9 +498,7 @@ function escapeHTML(str) {
 
 function showFruitView() {
     showView('fruit');
-    toggleFruitSubView('fruit-register');
-    renderFruitEntries();
-    renderSupplierDatalist();
+    toggleFruitSubView('fruit-national');
 }
 
 function toggleFruitSubView(tabId) {
@@ -503,19 +508,76 @@ function toggleFruitSubView(tabId) {
     document.querySelectorAll('#view-fruit .tab-content').forEach(tc => {
         tc.classList.toggle('hidden', tc.id !== tabId);
     });
-    if (tabId === 'fruit-summary') {
+    if (tabId === 'fruit-national') {
+        renderNationalEntries();
+    } else if (tabId === 'fruit-export') {
+        renderExportEntries();
+        renderSupplierDatalist();
+    } else if (tabId === 'fruit-summary') {
         const today = new Date().toISOString().split('T')[0];
         fruitDateFrom.value = today;
         fruitDateTo.value = today;
         renderFruitSummary();
-    } else {
-        renderFruitEntries();
     }
 }
 
 function getFruitRecords() {
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.FRUIT)) || [];
 }
+
+// --- Nacional ---
+
+function addNationalEntry() {
+    const crates = parseInt(fruitNationalCrates.value, 10);
+    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
+
+    const now = new Date();
+    const record = {
+        id: Date.now(),
+        type: 'Nacional',
+        supplier: '',
+        crates: crates,
+        weight: 0,
+        date: now.toLocaleDateString(),
+        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        observation: fruitNationalObs.value.trim()
+    };
+
+    const records = getFruitRecords();
+    records.unshift(record);
+    localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
+
+    fruitNationalCrates.value = '5';
+    fruitNationalObs.value = '';
+    renderNationalEntries();
+}
+
+window.deleteNationalEntry = function(id) {
+    if (!confirm('¿Eliminar este registro?')) return;
+    let records = getFruitRecords();
+    records = records.filter(r => r.id !== id);
+    localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
+    renderNationalEntries();
+};
+
+function renderNationalEntries() {
+    const today = new Date().toLocaleDateString();
+    const records = getFruitRecords().filter(r => r.date === today && r.type === 'Nacional');
+    const totalCrates = records.reduce((s, r) => s + r.crates, 0);
+
+    fruitNationalTodaySummary.innerHTML = `<span class="badge bg-info">Registros: ${records.length}</span> <span class="badge bg-warning">Gavetas: ${totalCrates}</span>`;
+
+    fruitNationalEntriesBody.innerHTML = records.map(r => `
+        <tr>
+            <td>${r.crates}</td>
+            <td>${r.time}</td>
+            <td><small>${escapeHTML(r.observation || '-')}</small></td>
+            <td><button class="btn btn-danger-sm" onclick="deleteNationalEntry(${r.id})">X</button></td>
+        </tr>
+    `).join('') || '<tr><td colspan="4" class="text-center">Sin registros hoy</td></tr>';
+}
+
+// --- Exportación ---
 
 function addFruitEntry() {
     const supplier = fruitSupplier.value.trim();
@@ -529,6 +591,7 @@ function addFruitEntry() {
     const now = new Date();
     const record = {
         id: Date.now(),
+        type: 'Exportación',
         supplier: supplier,
         crates: crates,
         weight: weight,
@@ -546,7 +609,7 @@ function addFruitEntry() {
     fruitWeight.value = '';
     fruitObs.value = '';
 
-    renderFruitEntries();
+    renderExportEntries();
     renderSupplierDatalist();
 }
 
@@ -555,12 +618,12 @@ window.deleteFruitEntry = function(id) {
     let records = getFruitRecords();
     records = records.filter(r => r.id !== id);
     localStorage.setItem(STORAGE_KEYS.FRUIT, JSON.stringify(records));
-    renderFruitEntries();
+    renderExportEntries();
 };
 
-function renderFruitEntries() {
+function renderExportEntries() {
     const today = new Date().toLocaleDateString();
-    const records = getFruitRecords().filter(r => r.date === today);
+    const records = getFruitRecords().filter(r => r.date === today && r.type === 'Exportación');
 
     const totalCrates = records.reduce((s, r) => s + r.crates, 0);
     const totalWeight = records.reduce((s, r) => s + r.weight, 0);
@@ -580,10 +643,12 @@ function renderFruitEntries() {
 
 function renderSupplierDatalist() {
     const records = getFruitRecords();
-    const suppliers = [...new Set(records.map(r => r.supplier))];
+    const suppliers = [...new Set(records.filter(r => r.type === 'Exportación').map(r => r.supplier).filter(Boolean))];
     const datalist = document.getElementById('supplierList');
     datalist.innerHTML = suppliers.map(s => `<option value="${escapeHTML(s)}">`).join('');
 }
+
+// --- Resumen ---
 
 function renderFruitSummary() {
     const from = fruitDateFrom.value;
@@ -596,21 +661,22 @@ function renderFruitSummary() {
         return recordDate >= from && recordDate <= to;
     });
 
-    const byDate = {};
-    filtered.forEach(r => {
-        if (!byDate[r.date]) byDate[r.date] = {};
-        if (!byDate[r.date][r.supplier]) {
-            byDate[r.date][r.supplier] = { count: 0, crates: 0, weight: 0 };
-        }
-        byDate[r.date][r.supplier].count++;
-        byDate[r.date][r.supplier].crates += r.crates;
-        byDate[r.date][r.supplier].weight += r.weight;
-    });
-
-    if (Object.keys(byDate).length === 0) {
+    if (filtered.length === 0) {
         fruitSummaryBody.innerHTML = '<tr><td colspan="5" class="text-center">Sin registros en este rango</td></tr>';
         return;
     }
+
+    const byDate = {};
+    filtered.forEach(r => {
+        if (!byDate[r.date]) byDate[r.date] = {};
+        const key = r.type === 'Nacional' ? `Nacional||${r.date}` : `${r.supplier}||${r.type}`;
+        if (!byDate[r.date][key]) {
+            byDate[r.date][key] = { supplier: r.supplier, type: r.type, count: 0, crates: 0, weight: 0 };
+        }
+        byDate[r.date][key].count++;
+        byDate[r.date][key].crates += r.crates;
+        byDate[r.date][key].weight += r.weight;
+    });
 
     const sortedDates = Object.keys(byDate).sort((a, b) => {
         const [da, ma, ya] = a.split('/');
@@ -622,37 +688,40 @@ function renderFruitSummary() {
     let html = '';
 
     sortedDates.forEach(date => {
-        const suppliers = byDate[date];
-        let dateCrates = 0, dateWeight = 0, dateCount = 0;
+        const entries = Object.values(byDate[date]);
+        let dateCount = 0, dateCrates = 0, dateWeight = 0;
 
-        const rows = Object.entries(suppliers).map(([name, data]) => {
-            dateCrates += data.crates;
-            dateWeight += data.weight;
-            dateCount += data.count;
-            return `<tr>
-                <td>${escapeHTML(name)}</td>
-                <td>${data.count}</td>
-                <td>${data.crates}</td>
-                <td>${data.weight.toFixed(1)}</td>
+        html += `<tr class="summary-date-row"><td colspan="5"><strong>${date}</strong></td></tr>`;
+
+        entries.forEach(e => {
+            html += `<tr>
+                <td><span class="badge ${e.type === 'Nacional' ? 'bg-info' : 'bg-success'}">${e.type === 'Nacional' ? 'Nacional' : 'Exportación'}</span></td>
+                <td>${e.type === 'Nacional' ? '—' : escapeHTML(e.supplier)}</td>
+                <td>${e.count}</td>
+                <td>${e.crates}</td>
+                <td>${e.type === 'Nacional' ? '—' : e.weight.toFixed(1)}</td>
             </tr>`;
-        }).join('');
+            dateCount += e.count;
+            dateCrates += e.crates;
+            dateWeight += e.weight;
+        });
 
-        html += `<tr class="summary-date-row"><td colspan="4"><strong>${date}</strong></td></tr>`;
-        html += rows;
         html += `<tr class="summary-date-subtotal">
             <td><em>Subtotal ${date}</em></td>
+            <td></td>
             <td>${dateCount}</td>
             <td>${dateCrates}</td>
             <td>${dateWeight.toFixed(1)}</td>
         </tr>`;
 
+        totalCount += dateCount;
         totalCrates += dateCrates;
         totalWeight += dateWeight;
-        totalCount += dateCount;
     });
 
     html += `<tr class="summary-grand-total">
         <td><strong>TOTAL</strong></td>
+        <td></td>
         <td><strong>${totalCount}</strong></td>
         <td><strong>${totalCrates}</strong></td>
         <td><strong>${totalWeight.toFixed(1)}</strong></td>
@@ -674,9 +743,9 @@ function exportFruitCSV() {
 
     if (filtered.length === 0) return alert('No hay registros para exportar en este rango');
 
-    let csv = "Proveedor,Gavetas,Peso_kg,Fecha,Hora,Observacion\n";
+    let csv = "Tipo,Proveedor,Gavetas,Peso_kg,Fecha,Hora,Observacion\n";
     filtered.forEach(r => {
-        csv += `"${r.supplier}",${r.crates},${r.weight},${r.date},${r.time},"${r.observation || ''}"\n`;
+        csv += `${r.type},"${r.supplier || ''}",${r.crates},${r.weight},${r.date},${r.time},"${r.observation || ''}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

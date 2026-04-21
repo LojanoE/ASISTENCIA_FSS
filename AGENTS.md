@@ -21,7 +21,7 @@ Vanilla HTML/CSS/JS SPA for attendance tracking with GPS and fruit shipment logg
 - Use CSS variables from `:root` — don't hardcode colors
 - Functions called from inline `onclick` (`openEditModal`, `deleteWorker`, `deleteFruitEntry`) are attached to `window` — new inline handlers need `window.` assignment too
 - Dates use `toLocaleDateString()` format (DD/MM/YYYY); comparison logic converts to YYYY-MM-DD
-- Fruit module: admin-only, accessed via "Envío de Fruta" button in admin header
+- Fruit module: admin-only, accessed via "Envío de Fruta" button in admin header. Two types: **Nacional** (crates only) and **Exportación** (supplier + crates + weight). Three tabs: Nacional / Exportación / Resumen. Resumen groups by date then supplier with subtotals.
 
 ## Known Issues
 - `eslint.config.js` references React/TS plugins but source is plain vanilla JS — config won't lint `.js` files

@@ -155,14 +155,49 @@
             </header>
 
             <div class="tab-bar">
-                <button class="tab-btn active" data-tab="fruit-register">Registro de Campo</button>
+                <button class="tab-btn active" data-tab="fruit-national">Nacional</button>
+                <button class="tab-btn" data-tab="fruit-export">Exportación</button>
                 <button class="tab-btn" data-tab="fruit-summary">Resumen</button>
             </div>
 
-            <!-- TAB: Registro de Campo -->
-            <div id="fruit-register" class="tab-content">
+            <!-- TAB: Nacional -->
+            <div id="fruit-national" class="tab-content">
                 <div class="card">
-                    <h2>Nuevo Registro</h2>
+                    <h2>Registro Nacional</h2>
+                    <div class="form-group">
+                        <label for="fruitNationalCrates">Gavetas Totales</label>
+                        <input type="number" id="fruitNationalCrates" value="5" min="1" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="fruitNationalObs">Observación</label>
+                        <input type="text" id="fruitNationalObs" placeholder="Opcional">
+                    </div>
+                    <button id="btnAddNational" class="btn btn-primary w-full">Agregar Registro</button>
+                </div>
+
+                <div class="card">
+                    <h2>Registros de Hoy — Nacional</h2>
+                    <div class="fruit-today-summary" id="fruitNationalTodaySummary"></div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Gavetas</th>
+                                    <th>Hora</th>
+                                    <th>Observación</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fruitNationalEntriesBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Exportación -->
+            <div id="fruit-export" class="tab-content hidden">
+                <div class="card">
+                    <h2>Registro Exportación</h2>
                     <div class="form-group">
                         <label for="fruitSupplier">Proveedor</label>
                         <input type="text" id="fruitSupplier" placeholder="Nombre del proveedor" list="supplierList">
@@ -186,7 +221,7 @@
                 </div>
 
                 <div class="card">
-                    <h2>Registros de Hoy</h2>
+                    <h2>Registros de Hoy — Exportación</h2>
                     <div class="fruit-today-summary" id="fruitTodaySummary"></div>
                     <div class="table-container">
                         <table>
@@ -209,7 +244,7 @@
             <div id="fruit-summary" class="tab-content hidden">
                 <div class="card full-width">
                     <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
-                        <h2>Resumen por Proveedor</h2>
+                        <h2>Resumen</h2>
                         <div class="form-inline" style="margin-bottom: 0;">
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label style="margin-bottom: 0; font-size: 0.7rem;">Desde:</label>
@@ -226,6 +261,7 @@
                         <table>
                             <thead>
                                 <tr>
+                                    <th>Tipo</th>
                                     <th>Proveedor</th>
                                     <th>Registros</th>
                                     <th>Gavetas</th>
