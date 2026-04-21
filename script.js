@@ -1,4 +1,4 @@
-// --- CONFIGURACIÃ“N ---
+// --- CONFIGURACIÓN ---
 const SESSION_KEY = 'attendance_session_v3';
 const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_settings_v3', 'attendance_fruit_v3'];
 
@@ -31,7 +31,7 @@ function cleanupOldData() {
 
 function handleDbError(err) {
     console.error('DB Error:', err);
-    alert('Error de conexiÃ³n. Verifique su acceso a internet e intente de nuevo.');
+    alert('Error de conexión. Verifique su acceso a internet e intente de nuevo.');
 }
 const views = {
     login: document.getElementById('view-login'),
@@ -64,14 +64,14 @@ const adminAttendanceBody = document.getElementById('adminAttendanceBody');
 const filterDateFrom = document.getElementById('filterDateFrom');
 const filterDateTo = document.getElementById('filterDateTo');
 
-// Modal de EdiciÃ³n
+// Modal de Edición
 const editModal = document.getElementById('editModal');
 const editTime = document.getElementById('editTime');
 const editObservation = document.getElementById('editObservation');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
 
-// Fruit View â€” Export
+// Fruit View — Export
 const fruitSupplier = document.getElementById('fruitSupplier');
 const fruitCrates = document.getElementById('fruitCrates');
 const fruitWeight = document.getElementById('fruitWeight');
@@ -82,7 +82,7 @@ const fruitSummaryBody = document.getElementById('fruitSummaryBody');
 const fruitDateFrom = document.getElementById('fruitDateFrom');
 const fruitDateTo = document.getElementById('fruitDateTo');
 
-// Fruit View â€” Nacional
+// Fruit View — Nacional
 const fruitNationalSupplier = document.getElementById('fruitNationalSupplier');
 const fruitNationalCrates = document.getElementById('fruitNationalCrates');
 const fruitNationalObs = document.getElementById('fruitNationalObs');
@@ -121,7 +121,7 @@ function downloadExcel(htmlTable, filename) {
     URL.revokeObjectURL(url);
 }
 
-// --- INICIALIZACIÃ“N ---
+// --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', async () => {
     cleanupOldData();
     initDateFilters();
@@ -184,7 +184,7 @@ document.getElementById('btnNextMonth').addEventListener('click', () => {
 });
 calendarWorker.addEventListener('change', () => renderCalendar());
 
-// --- LÃ“GICA DE LOGIN & SESIÃ“N ---
+// --- LÓGICA DE LOGIN & SESIÓN ---
 
 function initDateFilters() {
     const today = new Date().toISOString().split('T')[0];
@@ -214,7 +214,7 @@ async function handleLogin() {
                 showView('admin');
                 await renderAdminDashboard();
             } else {
-                alert('ContraseÃ±a incorrecta');
+                alert('Contraseña incorrecta');
             }
         } catch (err) {
             handleDbError(err);
@@ -262,7 +262,7 @@ function showView(viewKey) {
     views[viewKey].classList.remove('hidden');
 }
 
-// --- LÃ“GICA DE CONFIGURACIÃ“N ---
+// --- LÓGICA DE CONFIGURACIÓN ---
 
 async function loadSettings() {
     try {
@@ -284,7 +284,7 @@ async function saveSettings() {
     }
 }
 
-// --- LÃ“GICA GPS ---
+// --- LÓGICA GPS ---
 
 function startGpsTracking() {
     if (!navigator.geolocation) {
@@ -294,21 +294,21 @@ function startGpsTracking() {
     navigator.geolocation.watchPosition(
         (pos) => {
             currentCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-            gpsStatus.textContent = `ðŸ“ UbicaciÃ³n OK (PrecisiÃ³n: ${Math.round(pos.coords.accuracy)}m)`;
+            gpsStatus.innerHTML = `📍 Ubicación OK (Precisión: ${Math.round(pos.coords.accuracy)}m)`;
             gpsStatus.classList.add('bg-success');
         },
         (err) => {
-            gpsStatus.textContent = "âš ï¸ Error GPS: " + err.message;
+            gpsStatus.innerHTML = "⚠️ Error GPS: " + err.message;
             gpsStatus.classList.add('bg-danger');
         },
         { enableHighAccuracy: true }
     );
 }
 
-// --- LÃ“GICA DE ASISTENCIA ---
+// --- LÓGICA DE ASISTENCIA ---
 
 async function registerAttendance(type) {
-    if (!currentCoords) return alert("Esperando seÃ±al GPS...");
+    if (!currentCoords) return alert("Esperando señal GPS...");
 
     const now = new Date();
     const today = todayStr();
@@ -317,7 +317,7 @@ async function registerAttendance(type) {
         const records = await SupabaseDB.getRecords();
         const existing = records.find(r => r.worker === currentUser.name && r.date === today && r.type === type);
         if (existing) {
-            return alert(`Ya ha registrado su ${type} el dÃ­a de hoy (${existing.time}).`);
+            return alert(`Ya ha registrado su ${type} el día de hoy (${existing.time}).`);
         }
 
         const settings = await SupabaseDB.getSettings();
@@ -337,7 +337,7 @@ async function registerAttendance(type) {
         };
 
         await SupabaseDB.addRecord(record);
-        alert(`âœ… ${type} registrada: ${status} ${extra}`);
+        alert(`✅ ${type} registrada: ${status} ${extra}`);
         await renderWorkerDashboard();
     } catch (err) {
         handleDbError(err);
@@ -385,7 +385,7 @@ function calculateStatus(type, timeObj, settings) {
     return [statusBadge, extraInfo, diffMinsTotal];
 }
 
-// --- LÃ“GICA DE EDICIÃ“N (ADMIN) ---
+// --- LÓGICA DE EDICIÓN (ADMIN) ---
 
 window.openEditModal = async function(id) {
     try {
@@ -407,7 +407,7 @@ async function saveEdit() {
     const newTime = editTime.value;
     const observation = editObservation.value.trim();
 
-    if (!newTime) return alert('Seleccione una hora vÃ¡lida');
+    if (!newTime) return alert('Seleccione una hora válida');
     if (!observation) return alert('El justificativo es obligatorio');
 
     try {
@@ -502,7 +502,7 @@ async function renderAdminDashboard() {
                     <span class="badge ${getStatusClass(r.status)}">${r.status}</span>
                     <div style="font-size: 0.7rem">${r.extra}</div>
                 </td>
-                <td><a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">ðŸ“ Ver</a></td>
+                <td><a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">📍 Ver</a></td>
                 <td><small>${escapeHTML(r.observation || '-')}</small></td>
                 <td>
                     <button class="btn btn-edit-sm" onclick="openEditModal(${r.id})">Editar</button>
@@ -542,7 +542,7 @@ async function renderWorkerList() {
 }
 
 window.deleteWorker = async function(id) {
-    if (!confirm('Â¿Seguro que desea eliminar a este trabajador?')) return;
+    if (!confirm('¿Seguro que desea eliminar a este trabajador?')) return;
     try {
         await SupabaseDB.deleteWorker(id);
         await renderWorkerList();
@@ -588,7 +588,7 @@ async function exportAttendanceExcel() {
     }
 }
 
-// --- LÃ“GICA DE ENVÃO DE FRUTA ---
+// --- LÓGICA DE ENVÃO DE FRUTA ---
 
 function showFruitView() {
     showView('fruit');
@@ -622,7 +622,7 @@ async function addNationalEntry() {
     const supplier = fruitNationalSupplier.value.trim();
     const crates = parseInt(fruitNationalCrates.value, 10);
     if (!supplier) return alert('Ingrese el nombre del proveedor');
-    if (!crates || crates < 1) return alert('Ingrese una cantidad vÃ¡lida de gavetas');
+    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
 
     const now = new Date();
     const record = {
@@ -647,7 +647,7 @@ async function addNationalEntry() {
 }
 
 window.deleteNationalEntry = async function(id) {
-    if (!confirm('Â¿Eliminar este registro?')) return;
+    if (!confirm('¿Eliminar este registro?')) return;
     try {
         await SupabaseDB.deleteFruitRecord(id);
         await renderNationalEntries();
@@ -679,7 +679,7 @@ async function renderNationalEntries() {
     }
 }
 
-// --- ExportaciÃ³n ---
+// --- Exportación ---
 
 async function addFruitEntry() {
     const supplier = fruitSupplier.value.trim();
@@ -687,12 +687,12 @@ async function addFruitEntry() {
     const weight = parseFloat(fruitWeight.value);
 
     if (!supplier) return alert('Ingrese el nombre del proveedor');
-    if (!crates || crates < 1) return alert('Ingrese una cantidad vÃ¡lida de gavetas');
+    if (!crates || crates < 1) return alert('Ingrese una cantidad válida de gavetas');
     if (!weight || weight <= 0) return alert('Ingrese el peso');
 
     const now = new Date();
     const record = {
-        type: 'ExportaciÃ³n',
+        type: 'Exportación',
         supplier: supplier,
         crates: crates,
         weight: weight,
@@ -714,7 +714,7 @@ async function addFruitEntry() {
 }
 
 window.deleteFruitEntry = async function(id) {
-    if (!confirm('Â¿Eliminar este registro?')) return;
+    if (!confirm('¿Eliminar este registro?')) return;
     try {
         await SupabaseDB.deleteFruitRecord(id);
         await renderExportEntries();
@@ -727,7 +727,7 @@ async function renderExportEntries() {
     try {
         const records = await SupabaseDB.getFruitRecords();
         const today = todayStr();
-        const exports = records.filter(r => r.date === today && r.type === 'ExportaciÃ³n');
+        const exports = records.filter(r => r.date === today && r.type === 'Exportación');
 
         const totalCrates = exports.reduce((s, r) => s + r.crates, 0);
         const totalWeight = exports.reduce((s, r) => s + r.weight, 0);
@@ -810,9 +810,9 @@ async function renderFruitSummary() {
             html += `<tr class="summary-date-row"><td colspan="5"><strong>${date}</strong></td></tr>`;
 
             entries.forEach(e => {
-                const nacDisplay = e.nacCrates > 0 ? e.nacCrates : 'â€”';
-                const expDisplay = e.expCrates > 0 ? e.expCrates : 'â€”';
-                const weightDisplay = e.weight > 0 ? e.weight.toFixed(1) : 'â€”';
+                const nacDisplay = e.nacCrates > 0 ? e.nacCrates : '—';
+                const expDisplay = e.expCrates > 0 ? e.expCrates : '—';
+                const weightDisplay = e.weight > 0 ? e.weight.toFixed(1) : '—';
                 html += `<tr>
                     <td>${e.nacCrates > 0 ? '<span class="badge bg-info">Nac.</span>' : ''}${e.expCrates > 0 ? '<span class="badge bg-success">Exp.</span>' : ''}</td>
                     <td>${escapeHTML(e.supplier)}</td>
@@ -828,9 +828,9 @@ async function renderFruitSummary() {
             html += `<tr class="summary-date-subtotal">
                 <td><em>Subtotal ${date}</em></td>
                 <td></td>
-                <td>${dateNacCrates > 0 ? dateNacCrates : 'â€”'}</td>
-                <td>${dateExpCrates > 0 ? dateExpCrates : 'â€”'}</td>
-                <td>${dateWeight > 0 ? dateWeight.toFixed(1) : 'â€”'}</td>
+                <td>${dateNacCrates > 0 ? dateNacCrates : '—'}</td>
+                <td>${dateExpCrates > 0 ? dateExpCrates : '—'}</td>
+                <td>${dateWeight > 0 ? dateWeight.toFixed(1) : '—'}</td>
             </tr>`;
 
             totalNacCrates += dateNacCrates;
@@ -902,7 +902,7 @@ async function exportFruitExcel() {
 
             entries.forEach(e => {
                 html += `<tr><td>${date}</td>`;
-                html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'ExportaciÃ³n' : ''}</td>`;
+                html += `<td>${e.nacCrates > 0 ? 'Nacional' : ''}${e.expCrates > 0 ? (e.nacCrates > 0 ? ' / ' : '') + 'Exportación' : ''}</td>`;
                 html += `<td>${escapeHTML(e.supplier)}</td>`;
                 html += `<td>${e.nacCrates > 0 ? e.nacCrates : ''}</td>`;
                 html += `<td>${e.expCrates > 0 ? e.expCrates : ''}</td>`;
