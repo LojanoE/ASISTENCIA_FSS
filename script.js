@@ -1,5 +1,6 @@
 // --- CONFIGURACIÓN ---
 const SESSION_KEY = 'attendance_session_v3';
+const DEVICE_WORKER_KEY = 'device_worker';
 const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_settings_v3', 'attendance_fruit_v3'];
 
 // --- HELPERS ---
@@ -18,7 +19,7 @@ function timeStr() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function withLoading(btn, text, fn) {
+function withLoading(btn, text, fn, { reenable = true } = {}) {
     return async function() {
         const originalText = btn.textContent;
         btn.disabled = true;
@@ -27,6 +28,7 @@ function withLoading(btn, text, fn) {
             await fn();
         } finally {
             btn.textContent = originalText;
+            if (reenable) btn.disabled = false;
         }
     };
 }
@@ -158,8 +160,8 @@ btnLogin.addEventListener('click', withLoading(btnLogin, 'Ingresando...', handle
 document.getElementById('btnLogoutWorker').addEventListener('click', logout);
 document.getElementById('btnLogoutAdmin').addEventListener('click', logout);
 
-btnIn.addEventListener('click', withLoading(btnIn, 'Registrando...', () => registerAttendance('Entrada')));
-btnOut.addEventListener('click', withLoading(btnOut, 'Registrando...', () => registerAttendance('Salida')));
+btnIn.addEventListener('click', withLoading(btnIn, 'Registrando...', () => registerAttendance('Entrada'), { reenable: false }));
+btnOut.addEventListener('click', withLoading(btnOut, 'Registrando...', () => registerAttendance('Salida'), { reenable: false }));
 
 btnAddWorker.addEventListener('click', withLoading(btnAddWorker, 'Agregando...', addWorker));
 btnSaveSettings.addEventListener('click', withLoading(btnSaveSettings, 'Guardando...', saveSettings));
@@ -245,6 +247,7 @@ async function handleLogin() {
     } else {
         currentUser = { name: user, isAdmin: false };
         saveSession(currentUser);
+        localStorage.setItem(DEVICE_WORKER_KEY, user);
         showView('worker');
         await renderWorkerDashboard();
     }
@@ -262,6 +265,14 @@ async function checkSession() {
             await renderWorkerDashboard();
         }
     } else {
+        const deviceWorker = localStorage.getItem(DEVICE_WORKER_KEY);
+        if (deviceWorker) {
+            currentUser = { name: deviceWorker, isAdmin: false };
+            saveSession(currentUser);
+            showView('worker');
+            await renderWorkerDashboard();
+            return;
+        }
         showView('login');
     }
 }
@@ -271,13 +282,40 @@ function saveSession(user) {
 }
 
 function logout() {
+    if (currentUser && !currentUser.isAdmin) {
+        const adminPass = prompt('Ingrese contraseña de administrador para cambiar de usuario:');
+        if (adminPass === null) return;
+        verifyAdminBeforeLogout(adminPass);
+        return;
+    }
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(DEVICE_WORKER_KEY);
     currentUser = null;
     showView('login');
     loginUser.value = '';
     loginPass.value = '';
     passContainer.classList.add('hidden');
     renderWorkerSelect();
+}
+
+async function verifyAdminBeforeLogout(password) {
+    try {
+        const dbPassword = await SupabaseDB.getAdminPassword();
+        if (password === dbPassword) {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(DEVICE_WORKER_KEY);
+            currentUser = null;
+            showView('login');
+            loginUser.value = '';
+            loginPass.value = '';
+            passContainer.classList.add('hidden');
+            await renderWorkerSelect();
+        } else {
+            alert('Contraseña incorrecta');
+        }
+    } catch (err) {
+        handleDbError(err);
+    }
 }
 
 function showView(viewKey) {
@@ -533,11 +571,21 @@ async function addAdminRecord() {
 async function renderWorkerSelect() {
     try {
         const workers = await SupabaseDB.getWorkers();
-        loginUser.innerHTML = `
-            <option value="">-- Seleccione su nombre --</option>
-            <option value="admin">Administrador</option>
-            ${workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('')}
-        `;
+        const deviceWorker = localStorage.getItem(DEVICE_WORKER_KEY);
+
+        if (deviceWorker) {
+            loginUser.innerHTML = `
+                <option value="">-- Seleccione --</option>
+                <option value="admin">Administrador</option>
+                <option value="${escapeHTML(deviceWorker)}">${escapeHTML(deviceWorker)}</option>
+            `;
+        } else {
+            loginUser.innerHTML = `
+                <option value="">-- Seleccione su nombre --</option>
+                <option value="admin">Administrador</option>
+                ${workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('')}
+            `;
+        }
     } catch (err) {
         handleDbError(err);
     }
