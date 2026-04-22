@@ -154,6 +154,7 @@ h2 {
 
 .bg-success { background: #dcfce7 !important; color: #166534 !important; }
 .bg-danger { background: #fee2e2 !important; color: #991b1b !important; }
+.bg-incompleta { background: #ffedd5 !important; color: #9a3412 !important; }
 
 /* Botones Grandes para el Trabajador */
 .button-group-vertical { 
@@ -446,6 +447,7 @@ textarea:focus {
 
 .legend-puntual { background: #22c55e; }
 .legend-atraso { background: #ef4444; }
+.legend-incompleta { background: #f97316; }
 .legend-extra { background: #f59e0b; }
 .legend-sin-registro { background: #e2e8f0; }
 
@@ -495,6 +497,11 @@ textarea:focus {
 .calendar-day.atraso {
     background: #fee2e2;
     color: #991b1b;
+}
+
+.calendar-day.incompleta {
+    background: #ffedd5;
+    color: #9a3412;
 }
 
 .calendar-day.extra {

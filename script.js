@@ -384,7 +384,7 @@ async function registerAttendance(type) {
         }
 
         const settings = await SupabaseDB.getSettings();
-        const [status, extra, diff] = calculateStatus(type, now, settings);
+        const [status, extra, diff] = calculateStatus(type, now, settings, { worker: currentUser.name, date: today, records });
 
         const record = {
             worker: currentUser.name,
@@ -413,10 +413,12 @@ async function registerAttendance(type) {
     }
 }
 
-function calculateStatus(type, timeObj, settings) {
+function calculateStatus(type, timeObj, settings, context) {
     let statusBadge = '';
     let extraInfo = '';
     let diffMinsTotal = 0;
+
+    var jornadaMins = calcJornadaMins(settings);
 
     if (type === 'Entrada') {
         const [expH, expM] = settings.entryTime.split(':').map(Number);
@@ -435,23 +437,63 @@ function calculateStatus(type, timeObj, settings) {
             statusBadge = 'Puntual';
         }
     } else {
-        const [expH, expM] = settings.exitTime.split(':').map(Number);
-        const exitLimit = new Date(timeObj);
-        exitLimit.setHours(expH, expM, 0);
+        var entryTime = null;
+        if (context && context.worker && context.date && context.records) {
+            var entryRecord = context.records.find(function(r) {
+                return r.worker === context.worker && r.date === context.date && r.type === 'Entrada';
+            });
+            if (entryRecord) {
+                var parts = entryRecord.time.split(':');
+                entryTime = new Date(timeObj);
+                entryTime.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0);
+            }
+        }
 
-        if (timeObj > exitLimit) {
-            const diffMs = timeObj - exitLimit;
-            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            diffMinsTotal = Math.floor(diffMs / (1000 * 60));
-            
-            statusBadge = 'Extra';
-            extraInfo = `${diffHrs > 0 ? diffHrs + 'h ' : ''}${diffMins}m Extras`;
+        if (entryTime) {
+            var workedMs = timeObj - entryTime;
+            var workedMins = Math.floor(workedMs / (1000 * 60));
+            diffMinsTotal = Math.abs(workedMins - jornadaMins);
+
+            if (workedMins > jornadaMins) {
+                var extraMins = workedMins - jornadaMins;
+                var extraHrs = Math.floor(extraMins / 60);
+                var extraMinRem = extraMins % 60;
+                statusBadge = 'Extra';
+                extraInfo = `${extraHrs > 0 ? extraHrs + 'h ' : ''}${extraMinRem}m Extras`;
+            } else if (workedMins < jornadaMins) {
+                var faltaMins = jornadaMins - workedMins;
+                var faltaHrs = Math.floor(faltaMins / 60);
+                var faltaMinRem = faltaMins % 60;
+                statusBadge = 'Jornada incompleta';
+                extraInfo = `Faltan ${faltaHrs > 0 ? faltaHrs + 'h ' : ''}${faltaMinRem}m`;
+            } else {
+                statusBadge = 'Normal';
+            }
         } else {
-            statusBadge = 'Normal';
+            const [expH, expM] = settings.exitTime.split(':').map(Number);
+            const exitLimit = new Date(timeObj);
+            exitLimit.setHours(expH, expM, 0);
+
+            if (timeObj > exitLimit) {
+                var diffMs = timeObj - exitLimit;
+                var diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                var diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                diffMinsTotal = Math.floor(diffMs / (1000 * 60));
+                
+                statusBadge = 'Extra';
+                extraInfo = `${diffHrs > 0 ? diffHrs + 'h ' : ''}${diffMins}m Extras`;
+            } else {
+                statusBadge = 'Normal';
+            }
         }
     }
     return [statusBadge, extraInfo, diffMinsTotal];
+}
+
+function calcJornadaMins(settings) {
+    var eParts = settings.entryTime.split(':').map(Number);
+    var xParts = settings.exitTime.split(':').map(Number);
+    return (xParts[0] * 60 + xParts[1]) - (eParts[0] * 60 + eParts[1]);
 }
 
 // --- LÓGICA DE EDICIÓN (ADMIN) ---
@@ -489,7 +531,7 @@ async function saveEdit() {
         const [h, m] = newTime.split(':');
         const newDateObj = new Date(year, month - 1, day, h, m);
 
-        const [status, extra, diff] = calculateStatus(record.type, newDateObj, settings);
+        const [status, extra, diff] = calculateStatus(record.type, newDateObj, settings, { worker: record.worker, date: record.date, records });
 
         await SupabaseDB.updateRecord(recordToEditId, {
             time: newTime,
@@ -542,7 +584,7 @@ async function addAdminRecord() {
         const [h, min] = time.split(':');
         const dateObj = new Date(y, m - 1, d, h, min);
         const settings = await SupabaseDB.getSettings();
-        const [status, extra, diff] = calculateStatus(type, dateObj, settings);
+        const [status, extra, diff] = calculateStatus(type, dateObj, settings, { worker: worker, date: date, records: records });
 
         await SupabaseDB.addRecord({
             worker, type, date, time,
@@ -694,6 +736,7 @@ function getStatusClass(status) {
         case 'Atraso': return 'bg-danger';
         case 'Puntual': return 'bg-success';
         case 'Extra': return 'bg-warning';
+        case 'Jornada incompleta': return 'bg-incompleta';
         default: return 'bg-info';
     }
 }
@@ -1106,9 +1149,10 @@ async function renderCalendar() {
                 cell.classList.add('sin-registro');
                 cell.innerHTML = `<span class="day-num">${d}</span>`;
             } else {
-                // Determine overall status: worst wins (Atraso > Extra > Puntual/Normal)
+                // Determine overall status: worst wins (Atraso/Jornada incompleta > Extra > Puntual/Normal)
                 let hasEntry = entries.some(e => e.type === 'Entrada');
                 let hasAtraso = entries.some(e => e.status === 'Atraso');
+                let hasIncomplete = entries.some(e => e.status === 'Jornada incompleta');
                 let hasExtra = entries.some(e => e.status === 'Extra');
                 let isPuntual = entries.some(e => e.status === 'Puntual');
                 let isNormal = entries.some(e => e.status === 'Normal');
@@ -1119,6 +1163,9 @@ async function renderCalendar() {
                 if (hasAtraso) {
                     statusClass = 'atraso';
                     statusText = 'Atraso';
+                } else if (hasIncomplete) {
+                    statusClass = 'incompleta';
+                    statusText = 'Jorn. incompleta';
                 } else if (hasExtra && !isPuntual) {
                     statusClass = 'extra';
                     statusText = 'Extra';
