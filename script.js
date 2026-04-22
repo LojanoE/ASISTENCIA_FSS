@@ -349,7 +349,8 @@ async function saveSettings() {
 
 function startGpsTracking() {
     if (!navigator.geolocation) {
-        gpsStatus.textContent = "GPS no disponible";
+        gpsStatus.innerHTML = '⚠️ Sin GPS — Se registrará sin ubicación';
+        gpsStatus.classList.add('bg-danger');
         return;
     }
     navigator.geolocation.watchPosition(
@@ -359,7 +360,7 @@ function startGpsTracking() {
             gpsStatus.classList.add('bg-success');
         },
         (err) => {
-            gpsStatus.innerHTML = "⚠️ Error GPS: " + err.message;
+            gpsStatus.innerHTML = "⚠️ Sin GPS — Se registrará sin ubicación";
             gpsStatus.classList.add('bg-danger');
         },
         { enableHighAccuracy: true }
@@ -369,10 +370,7 @@ function startGpsTracking() {
 // --- LÓGICA DE ASISTENCIA ---
 
 async function registerAttendance(type) {
-    if (!currentCoords) {
-        await renderWorkerDashboard();
-        return alert("Esperando señal GPS...");
-    }
+    const noGps = !currentCoords;
 
     const now = new Date();
     const today = todayStr();
@@ -393,12 +391,12 @@ async function registerAttendance(type) {
             type: type,
             date: today,
             time: timeStr(),
-            lat: currentCoords.lat,
-            lon: currentCoords.lon,
+            lat: currentCoords ? currentCoords.lat : 0,
+            lon: currentCoords ? currentCoords.lon : 0,
             status: status,
             extra: extra,
             diffMins: diff,
-            observation: ''
+            observation: noGps ? 'Sin GPS' : ''
         };
 
         await SupabaseDB.addRecord(record);
@@ -641,7 +639,7 @@ async function renderAdminDashboard() {
                     <span class="badge ${getStatusClass(r.status)}">${r.status}</span>
                     <div style="font-size: 0.7rem">${r.extra}</div>
                 </td>
-                <td><a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">📍 Ver</a></td>
+                <td>${r.lat === 0 && r.lon === 0 ? '⚠️ Sin GPS' : `<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" class="maps-link">📍 Ver</a>`}</td>
                 <td><small>${escapeHTML(r.observation || '-')}</small></td>
                 <td>
                     <button class="btn btn-edit-sm" onclick="openEditModal(${r.id})">Editar</button>
