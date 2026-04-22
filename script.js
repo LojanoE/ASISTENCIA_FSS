@@ -77,6 +77,17 @@ const editObservation = document.getElementById('editObservation');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 const btnCancelEdit = document.getElementById('btnCancelEdit');
 
+// Modal de Registro Manual (Admin)
+const addRecordModal = document.getElementById('addRecordModal');
+const addRecordWorker = document.getElementById('addRecordWorker');
+const addRecordType = document.getElementById('addRecordType');
+const addRecordDate = document.getElementById('addRecordDate');
+const addRecordTime = document.getElementById('addRecordTime');
+const addRecordObs = document.getElementById('addRecordObs');
+const btnSaveRecord = document.getElementById('btnSaveRecord');
+const btnCancelRecord = document.getElementById('btnCancelRecord');
+const btnAddRecord = document.getElementById('btnAddRecord');
+
 // Fruit View — Export
 const fruitSupplier = document.getElementById('fruitSupplier');
 const fruitCrates = document.getElementById('fruitCrates');
@@ -161,6 +172,12 @@ btnSaveEdit.addEventListener('click', withLoading(btnSaveEdit, 'Guardando...', s
 btnCancelEdit.addEventListener('click', () => {
     editModal.classList.add('hidden');
     recordToEditId = null;
+});
+
+btnAddRecord.addEventListener('click', openAddRecordModal);
+btnSaveRecord.addEventListener('click', withLoading(btnSaveRecord, 'Guardando...', addAdminRecord));
+btnCancelRecord.addEventListener('click', () => {
+    addRecordModal.classList.add('hidden');
 });
 
 // Fruit module event listeners
@@ -452,6 +469,62 @@ async function saveEdit() {
         await renderAdminDashboard();
     } catch (err) {
         handleDbError(err);
+    }
+}
+
+async function openAddRecordModal() {
+    try {
+        const workers = await SupabaseDB.getWorkers();
+        addRecordWorker.innerHTML = workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('');
+        addRecordDate.value = todayStr();
+        addRecordTime.value = '';
+        addRecordObs.value = '';
+        addRecordType.value = 'Entrada';
+        addRecordModal.classList.remove('hidden');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function addAdminRecord() {
+    const worker = addRecordWorker.value;
+    const type = addRecordType.value;
+    const date = addRecordDate.value;
+    const time = addRecordTime.value;
+    const observation = addRecordObs.value.trim();
+
+    if (!worker || !date || !time) return alert('Complete todos los campos obligatorios');
+
+    try {
+        const records = await SupabaseDB.getRecords();
+        const existing = records.find(r => r.worker === worker && r.date === date && r.type === type);
+        if (existing) {
+            return alert(`Ya existe un registro de ${type} para ${worker} el ${displayDate(date)} (${existing.time}).`);
+        }
+
+        const [y, m, d] = date.split('-');
+        const [h, min] = time.split(':');
+        const dateObj = new Date(y, m - 1, d, h, min);
+        const settings = await SupabaseDB.getSettings();
+        const [status, extra, diff] = calculateStatus(type, dateObj, settings);
+
+        await SupabaseDB.addRecord({
+            worker, type, date, time,
+            lat: 0, lon: 0,
+            status, extra, diffMins: diff,
+            observation: observation || 'Registro manual'
+        });
+
+        alert(`✅ ${type} registrada para ${worker}: ${status} ${extra}`);
+        addRecordModal.classList.add('hidden');
+        await renderAdminDashboard();
+    } catch (err) {
+        if (err && err.code === '23505') {
+            alert(`Ya existe un registro de ${type} para ${worker} en esa fecha.`);
+            await renderAdminDashboard();
+        } else {
+            handleDbError(err);
+        }
     }
 }
 

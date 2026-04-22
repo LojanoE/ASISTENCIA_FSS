@@ -123,6 +123,7 @@
                             </div>
                         </div>
                         <button id="btnExport" class="btn btn-outline">Exportar Excel</button>
+                        <button id="btnAddRecord" class="btn btn-outline-sm">+ Registrar Asistencia</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -328,6 +329,40 @@
             <div class="button-group-vertical">
                 <button id="btnSaveEdit" class="btn btn-primary">Guardar Cambios</button>
                 <button id="btnCancelEdit" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE REGISTRO MANUAL (ADMIN) -->
+    <div id="addRecordModal" class="modal hidden">
+        <div class="modal-content card">
+            <h2>Registrar Asistencia</h2>
+            <div class="form-group">
+                <label for="addRecordWorker">Trabajador</label>
+                <select id="addRecordWorker"></select>
+            </div>
+            <div class="form-group">
+                <label for="addRecordType">Tipo</label>
+                <select id="addRecordType">
+                    <option value="Entrada">Entrada</option>
+                    <option value="Salida">Salida</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="addRecordDate">Fecha</label>
+                <input type="date" id="addRecordDate">
+            </div>
+            <div class="form-group">
+                <label for="addRecordTime">Hora</label>
+                <input type="time" id="addRecordTime">
+            </div>
+            <div class="form-group">
+                <label for="addRecordObs">Observación</label>
+                <textarea id="addRecordObs" rows="2" placeholder="Justificativo del registro manual..."></textarea>
+            </div>
+            <div class="button-group-vertical">
+                <button id="btnSaveRecord" class="btn btn-primary">Guardar Registro</button>
+                <button id="btnCancelRecord" class="btn btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
