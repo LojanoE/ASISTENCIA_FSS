@@ -1,11 +1,11 @@
 # AGENTS.md — Asistencia FSS
 
 ## Project Overview
-Vanilla HTML/CSS/JS SPA for attendance tracking with GPS and fruit shipment logging. No build step, no bundler, no framework. Persistence via **Supabase** (PostgreSQL). Session state only in `localStorage`.
+Vanilla HTML/CSS/JS SPA for attendance tracking (GPS optional) and fruit shipment logging. No build step, no bundler, no framework. Persistence via **Supabase** (PostgreSQL). Session state only in `localStorage`.
 
 ## Dev Commands
 - Run locally: `npx serve .` or open `index.html` directly in a browser
-- Requires HTTPS or localhost for Geolocation API to work
+- GPS is optional — works without HTTPS (registers as 'Sin GPS')
 - Requires internet connection for Supabase — no offline mode
 
 ## Architecture
@@ -26,6 +26,36 @@ Vanilla HTML/CSS/JS SPA for attendance tracking with GPS and fruit shipment logg
 - Dates use `toLocaleDateString()` format (DD/MM/YYYY); comparison logic converts to YYYY-MM-DD
 - Fruit module: admin-only, two types: **Nacional** (supplier + crates) and **Exportación** (supplier + crates + weight). Three tabs: Nacional / Exportación / Resumen. Resumen groups by date then supplier, with separate Gav. Nac. and Gav. Exp. columns. Both types share suppliers via `<datalist>`
 - Export buttons generate Excel (.xls) via HTML table with Office XML namespace — no CSV
+
+### Attendance Status System
+- **Entrada** (compared against `settings.entry_time`):
+  - `Puntual`: llegó a hora o antes
+  - `Atraso`: llegó tarde (diferencia en minutos)
+- **Salida** (calculated based on worked hours from entry→exit):
+  - `Normal`: trabajó exactamente la jornada configurada (ej: 7:30-16:30 = 9h)
+  - `Jornada incompleta`: trabajó menos horas (faltan X horas/minutos)
+  - `Extra`: trabajó más horas (excede en X horas/minutos)
+- **Fallback**: Si no hay entrada registrada para ese día, compara contra `settings.exit_time` (comportamiento anterior)
+
+### GPS Handling
+- GPS is optional — registration works without it
+- When no GPS: `lat: 0`, `lon: 0`, `observation: 'Sin GPS'`
+- UI shows "⚠️ Sin GPS — Se registrará sin ubicación"
+- Table displays "⚠️ Sin GPS" instead of Google Maps link when `lat === 0 && lon === 0`
+
+### Calendar Color Coding
+Legend (in order of priority for display):
+- 🔴 **Atraso** (red) — late arrival
+- 🟠 **Jornada incompleta** (orange) — worked less than full day
+- 🟢 **Puntual** (green) — on time
+- 🟡 **Extra** (yellow) — worked overtime
+- ⚪ **Sin registro** (gray)
+
+### Key Functions
+- `calculateStatus(type, timeObj, settings, context)` — determines attendance status
+  - For `Salida`: uses `context` `{worker, date, records}` to find entry record and calculate total worked hours
+  - Returns `[statusBadge, extraInfo, diffMinsTotal]`
+- `calcJornadaMins(settings)` — calculates expected workday duration in minutes from `entry_time` to `exit_time`
 
 ## Supabase Schema
 - Table `workers`: `id` (bigint PK), `name` (text), `created_at` (timestamptz)
