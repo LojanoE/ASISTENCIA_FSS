@@ -149,9 +149,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await renderWorkerSelect();
         await loadSettings();
+        // Verificar y cerrar salidas pendientes al cargar (para días anteriores)
+        await autoCloseMissingExits();
     } catch (err) {
         handleDbError(err);
     }
+    
+    // Verificación periódica cada 60 segundos para cierre automático a las 23:00
+    setInterval(async () => {
+        await autoCloseMissingExits();
+    }, 60000);
 });
 
 // --- EVENT LISTENERS ---
@@ -494,6 +501,106 @@ function calcJornadaMins(settings) {
     var eParts = settings.entryTime.split(':').map(Number);
     var xParts = settings.exitTime.split(':').map(Number);
     return (xParts[0] * 60 + xParts[1]) - (eParts[0] * 60 + eParts[1]);
+}
+
+// --- SALIDA AUTOMÁTICA (CIERRE DE JORNADAS SIN SALIDA) ---
+
+async function autoCloseMissingExits() {
+    const now = new Date();
+    const today = todayStr();
+    const currentHour = now.getHours();
+    
+    // Verificar si es momento de ejecutar (23:00 o más tarde) para el día actual
+    const isAfter23h = currentHour >= 23;
+    
+    try {
+        const records = await SupabaseDB.getRecords();
+        const settings = await SupabaseDB.getSettings();
+        
+        // Agrupar registros por (worker, date)
+        const byWorkerDate = {};
+        records.forEach(r => {
+            const key = `${r.worker}|${r.date}`;
+            if (!byWorkerDate[key]) {
+                byWorkerDate[key] = { worker: r.worker, date: r.date, entrada: null, salida: null };
+            }
+            if (r.type === 'Entrada') byWorkerDate[key].entrada = r;
+            if (r.type === 'Salida') byWorkerDate[key].salida = r;
+        });
+        
+        // Encontrar workers con entrada pero sin salida
+        const pendingExits = Object.values(byWorkerDate).filter(item => item.entrada && !item.salida);
+        
+        if (pendingExits.length === 0) {
+            return;
+        }
+        
+        // Para cada caso pendiente, verificar si corresponde cerrar
+        let closedCount = 0;
+        
+        for (const item of pendingExits) {
+            const entryDate = item.date;
+            
+            // Condiciones para cerrar:
+            // 1. Fecha anterior a hoy: cerrar siempre (estos casos siempre se cierran)
+            // 2. Fecha de hoy: solo si ya son las 23:00 o más
+            const shouldClose = entryDate < today || (entryDate === today && isAfter23h);
+            
+            if (!shouldClose) {
+                continue;
+            }
+            
+            // Construir la hora de salida usando settings.exitTime
+            const [exitHour, exitMinute] = settings.exitTime.split(':').map(Number);
+            
+            // Crear el objeto Date para calculateStatus
+            // Usar la fecha de la entrada con la hora configurada de salida
+            const [entryYear, entryMonth, entryDay] = entryDate.split('-').map(Number);
+            const exitDateTime = new Date(entryYear, entryMonth - 1, entryDay, exitHour, exitMinute);
+            
+            // Calcular el status
+            const context = { worker: item.worker, date: entryDate, records: records };
+            const [status, extra, diff] = calculateStatus('Salida', exitDateTime, settings, context);
+            
+            // Crear el registro de salida automática
+            const exitRecord = {
+                worker: item.worker,
+                type: 'Salida',
+                date: entryDate,
+                time: settings.exitTime,
+                lat: 0,
+                lon: 0,
+                status: status,
+                extra: extra,
+                diffMins: diff,
+                observation: 'Salida automática'
+            };
+            
+            try {
+                await SupabaseDB.addRecord(exitRecord);
+                closedCount++;
+                console.log(`[Auto Exit] Cerrada salida para ${item.worker} el ${entryDate} a las ${settings.exitTime} (${status})`);
+            } catch (err) {
+                // Si da error 23505 (duplicado), otro usuario ya la cerró
+                if (err && err.code === '23505') {
+                    console.log(`[Auto Exit] Salida ya existía para ${item.worker} el ${entryDate}`);
+                } else {
+                    console.error('[Auto Exit] Error al cerrar:', err);
+                }
+            }
+        }
+        
+        if (closedCount > 0) {
+            console.log(`[Auto Exit] Total de salidas cerradas: ${closedCount}`);
+            // Si estamos en la vista del worker, refrescar
+            if (currentUser && !currentUser.isAdmin) {
+                await renderWorkerDashboard();
+            }
+        }
+        
+    } catch (err) {
+        console.error('[Auto Exit] Error general:', err);
+    }
 }
 
 // --- LÓGICA DE EDICIÓN (ADMIN) ---
