@@ -141,6 +141,14 @@ const workerTransactionsBody = document.getElementById('workerTransactionsBody')
 const workerBalanceFrom = document.getElementById('workerBalanceFrom');
 const workerBalanceTo = document.getElementById('workerBalanceTo');
 
+// Accounting — Consulta Rápida
+const accQuickWorker = document.getElementById('accQuickWorker');
+const accQuickFrom = document.getElementById('accQuickFrom');
+const accQuickTo = document.getElementById('accQuickTo');
+const accQuickSummary = document.getElementById('accQuickSummary');
+const accQuickBody = document.getElementById('accQuickBody');
+const btnQuickWhatsApp = document.getElementById('btnQuickWhatsApp');
+
 // Modal de edición de movimiento
 const editTransactionModal = document.getElementById('editTransactionModal');
 const editTxWorker = document.getElementById('editTxWorker');
@@ -268,6 +276,10 @@ accReportPeriod.addEventListener('change', () => renderPayrollReport());
 btnExportPayroll.addEventListener('click', withLoading(btnExportPayroll, 'Exportando...', exportPayrollExcel));
 workerBalanceFrom.addEventListener('change', () => renderWorkerBalance());
 workerBalanceTo.addEventListener('change', () => renderWorkerBalance());
+accQuickWorker.addEventListener('change', () => renderQuickView());
+accQuickFrom.addEventListener('change', () => renderQuickView());
+accQuickTo.addEventListener('change', () => renderQuickView());
+btnQuickWhatsApp.addEventListener('click', shareQuickSummaryWhatsApp);
 btnSaveTransactionEdit.addEventListener('click', withLoading(btnSaveTransactionEdit, 'Guardando...', saveTransactionEdit));
 btnCancelTransactionEdit.addEventListener('click', () => {
     editTransactionModal.classList.add('hidden');
@@ -1311,6 +1323,9 @@ async function toggleAccountingSubView(tabId) {
     });
     if (tabId === 'accounting-transactions') {
         await renderAccountingTransactions();
+    } else if (tabId === 'accounting-quick') {
+        await renderQuickWorkerSelect();
+        await renderQuickView();
     } else if (tabId === 'accounting-periods') {
         await renderPayrollPeriods();
     } else if (tabId === 'accounting-report') {
@@ -1503,6 +1518,121 @@ Monto: $${tx.amount.toFixed(2)}${tx.description ? `\nDetalle: ${tx.description}`
         handleDbError(err);
     }
 };
+
+// --- Consulta Rápida por Trabajador ---
+
+async function renderQuickWorkerSelect() {
+    try {
+        const workers = await SupabaseDB.getWorkers();
+        const currentValue = accQuickWorker.value;
+        accQuickWorker.innerHTML = '<option value="">-- Seleccione --</option>' +
+            workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('');
+        if (currentValue) accQuickWorker.value = currentValue;
+
+        const today = todayStr();
+        if (!accQuickFrom.value) accQuickFrom.value = `${today.slice(0, 7)}-01`;
+        if (!accQuickTo.value) accQuickTo.value = today;
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function renderQuickView() {
+    const worker = accQuickWorker.value;
+    if (!worker) {
+        accQuickSummary.innerHTML = '<p class="text-center" style="color: var(--text-muted);">Seleccione un trabajador</p>';
+        accQuickBody.innerHTML = '<tr><td colspan="4" class="text-center">—</td></tr>';
+        btnQuickWhatsApp.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const transactions = await SupabaseDB.getTransactions({
+            worker,
+            from: accQuickFrom.value,
+            to: accQuickTo.value
+        });
+
+        const typeLabels = {
+            adelanto: 'Adelanto',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamo / Avance',
+            otro_descuento: 'Otro descuento'
+        };
+
+        const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
+        transactions.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
+        const total = transactions.reduce((s, t) => s + t.amount, 0);
+
+        accQuickSummary.innerHTML = `
+            <p style="margin-bottom: 0.75rem;"><strong>${escapeHTML(worker)}</strong> — ${displayDate(accQuickFrom.value)} al ${displayDate(accQuickTo.value)}</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem; margin-bottom: 1rem;">
+                <div class="balance-item"><small>Adelantos</small><div>$${byType.adelanto.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Víveres</small><div>$${byType.viveres.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Préstamos</small><div>$${byType.prestamo.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Otros desc.</small><div>$${byType.otro_descuento.toFixed(2)}</div></div>
+            </div>
+            <div class="balance-total" style="text-align: center; padding: 1rem; border-radius: 0.75rem; background: var(--primary-color); color: white;">
+                <strong>TOTAL ACUMULADO</strong>
+                <div style="font-size: 1.5rem; font-weight: bold;">$${total.toFixed(2)}</div>
+            </div>
+        `;
+
+        accQuickBody.innerHTML = transactions.length
+            ? transactions.map(t => `
+                <tr>
+                    <td>${displayDate(t.date)}</td>
+                    <td>${typeLabels[t.type] || t.type}</td>
+                    <td>$${t.amount.toFixed(2)}</td>
+                    <td><small>${escapeHTML(t.description || '-')}</small></td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="4" class="text-center">Sin movimientos en este rango</td></tr>';
+
+        btnQuickWhatsApp.classList.remove('hidden');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function shareQuickSummaryWhatsApp() {
+    const worker = accQuickWorker.value;
+    if (!worker) return;
+
+    try {
+        const transactions = await SupabaseDB.getTransactions({
+            worker,
+            from: accQuickFrom.value,
+            to: accQuickTo.value
+        });
+
+        const typeLabels = {
+            adelanto: 'Adelantos',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamos / Avances',
+            otro_descuento: 'Otros descuentos'
+        };
+
+        const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
+        transactions.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
+        const total = transactions.reduce((s, t) => s + t.amount, 0);
+
+        const lines = Object.keys(typeLabels)
+            .filter(k => byType[k] > 0)
+            .map(k => `${typeLabels[k]}: $${byType[k].toFixed(2)}`)
+            .join('\n');
+
+        const msg =
+`*RESUMEN DE CUENTA - FSS*
+Trabajador: ${worker}
+Período consultado: ${displayDate(accQuickFrom.value)} al ${displayDate(accQuickTo.value)}
+${lines ? lines + '\n' : ''}TOTAL ACUMULADO: $${total.toFixed(2)}`;
+
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
 
 // --- Períodos de Pago ---
 

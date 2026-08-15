@@ -30,7 +30,7 @@ Vanilla HTML/CSS/JS SPA for attendance tracking (GPS optional) and fruit shipmen
 ### Accounting Module
 - Separate **accountant login** (external person, not admin): select "Contador" in the login dropdown, password is hardcoded in `CONTADOR_PASSWORD` (`FINCASS`). Session stored with `isAccountant: true`; accountant lands directly on `#view-accounting` and cannot access the admin panel
 - Admin can also open the module via the "💰 Contabilidad" button in the admin header
-- Admin-only view (`#view-accounting`) with three tabs: **Movimientos**, **Cierre de Pago**, **Reporte**
+- Admin-only view (`#view-accounting`) with four tabs: **Movimientos**, **Consulta Rápida**, **Cierre de Pago**, **Reporte**
 - Transaction types: `adelanto`, `viveres`, `prestamo`, `otro_descuento` — amounts always positive
 - Transactions can be **edited** (modal `#editTransactionModal`) or **deleted**
 - Each transaction row has a **WhatsApp share button** (`shareTransactionWhatsApp`) — opens `wa.me` with a preformatted message (date, worker, type, amount, detail, period balance). Also offered right after registering a transaction
@@ -74,6 +74,7 @@ Legend (in order of priority for display):
 - `calcJornadaMins(settings)` — calculates expected workday duration in minutes from `entry_time` to `exit_time`
 - `addTransaction()`, `renderAccountingTransactions()`, `deleteTransaction(id)`, `openEditTransactionModal(id)`, `saveTransactionEdit()` — manage worker advances/charges
 - `shareTransactionWhatsApp(id)` — builds a WhatsApp (`wa.me`) message with the movement details and period balance
+- `renderQuickView()`, `shareQuickSummaryWhatsApp()` — per-worker quick lookup tab: pick worker + date range, shows totals by type, accumulated total and detail table; WhatsApp button shares the summary
 - `addPayrollPeriod()`, `renderPayrollPeriods()`, `closePayrollPeriod()` — manage monthly payroll periods
 - `savePayrollEntries()` — saves `base_salary`/`adjustments` per worker for the selected period
 - `renderPayrollReport()`, `exportPayrollExcel()` — calculate and export net balances

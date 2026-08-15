@@ -565,6 +565,10 @@ textarea:focus {
 }
 
 /* WhatsApp button */
+.btn-whatsapp {
+    background: #25D366;
+    color: white;
+}
 .btn-whatsapp-sm {
     background: #25D366;
     color: white;
