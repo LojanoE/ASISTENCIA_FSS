@@ -517,3 +517,93 @@ textarea:focus {
     font-size: 0.6rem;
     font-weight: 700;
 }
+
+/* Expand accounting view width */
+#view-accounting {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* Balance cards in worker view */
+.balance-item {
+    background: #f8fafc;
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    text-align: center;
+}
+.balance-item small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+}
+.balance-item div {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* Period list rows */
+.period-row:last-child {
+    border-bottom: none;
+}
+
+/* WhatsApp button */
+.btn-whatsapp-sm {
+    background: #25D366;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.4rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+}
+
+/* Mobile-friendly adjustments for accounting (Android/iOS) */
+@media (max-width: 768px) {
+    #view-accounting {
+        padding: 0 0.25rem;
+    }
+    #view-accounting .card {
+        padding: 1rem;
+    }
+    #view-accounting table {
+        font-size: 0.75rem;
+    }
+    #view-accounting th, #view-accounting td {
+        padding: 0.5rem 0.35rem;
+        font-size: 0.75rem;
+    }
+    #view-accounting .log-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    #view-accounting .log-header .form-inline,
+    #view-accounting .log-header .form-group,
+    #view-accounting .log-header select,
+    #view-accounting .log-header input {
+        width: 100%;
+    }
+    .fruit-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    #accPayrollEntriesBody input {
+        width: 100% !important;
+    }
+    /* Botones de acción en tablas más grandes para dedo */
+    #view-accounting .btn-whatsapp-sm,
+    #view-accounting .btn-edit-sm,
+    #view-accounting .btn-danger-sm {
+        padding: 0.5rem 0.7rem;
+        font-size: 0.85rem;
+        margin: 0.1rem;
+    }
+    /* Input type=date más cómodo en iOS/Android */
+    #view-accounting input[type="date"],
+    #view-accounting input[type="number"] {
+        font-size: 1rem; /* evita zoom automático en iOS */
+        min-height: 2.75rem;
+    }
+}

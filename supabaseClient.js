@@ -141,5 +141,148 @@ const SupabaseDB = {
         const { data, error } = await _supabase.from('fruit').select('supplier').neq('supplier', '');
         if (error) throw error;
         return [...new Set(data.map(r => r.supplier).filter(Boolean))];
+    },
+
+    // --- Worker Transactions (adelantos y cargos) ---
+    async getTransactions(filters = {}) {
+        let query = _supabase.from('worker_transactions').select('*').order('id', { ascending: false });
+        if (filters.worker) query = query.eq('worker', filters.worker);
+        if (filters.type) query = query.eq('type', filters.type);
+        if (filters.from) query = query.gte('date', filters.from);
+        if (filters.to) query = query.lte('date', filters.to);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data.map(r => ({
+            id: r.id,
+            worker: r.worker,
+            type: r.type,
+            amount: parseFloat(r.amount),
+            date: r.date,
+            description: r.description || '',
+            createdBy: r.created_by || '',
+            createdAt: r.created_at
+        }));
+    },
+    async addTransaction(record) {
+        const row = {
+            worker: record.worker,
+            type: record.type,
+            amount: record.amount,
+            date: record.date,
+            description: record.description || '',
+            created_by: record.createdBy || ''
+        };
+        const { data, error } = await _supabase.from('worker_transactions').insert(row).select().single();
+        if (error) throw error;
+        return data.id;
+    },
+    async deleteTransaction(id) {
+        const { error } = await _supabase.from('worker_transactions').delete().eq('id', id);
+        if (error) throw error;
+    },
+    async updateTransaction(id, updates) {
+        const row = {};
+        if (updates.worker !== undefined) row.worker = updates.worker;
+        if (updates.type !== undefined) row.type = updates.type;
+        if (updates.amount !== undefined) row.amount = updates.amount;
+        if (updates.date !== undefined) row.date = updates.date;
+        if (updates.description !== undefined) row.description = updates.description;
+        const { error } = await _supabase.from('worker_transactions').update(row).eq('id', id);
+        if (error) throw error;
+    },
+
+    // --- Payroll Periods ---
+    async getPayrollPeriods() {
+        const { data, error } = await _supabase.from('payroll_periods').select('*').order('id', { ascending: false });
+        if (error) throw error;
+        return data.map(r => ({
+            id: r.id,
+            name: r.name,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            status: r.status,
+            createdAt: r.created_at
+        }));
+    },
+    async getPayrollPeriod(id) {
+        const { data, error } = await _supabase.from('payroll_periods').select('*').eq('id', id).single();
+        if (error) throw error;
+        return {
+            id: data.id,
+            name: data.name,
+            startDate: data.start_date,
+            endDate: data.end_date,
+            status: data.status,
+            createdAt: data.created_at
+        };
+    },
+    async addPayrollPeriod(period) {
+        const row = {
+            name: period.name,
+            start_date: period.startDate,
+            end_date: period.endDate,
+            status: period.status || 'abierto'
+        };
+        const { data, error } = await _supabase.from('payroll_periods').insert(row).select().single();
+        if (error) throw error;
+        return data.id;
+    },
+    async updatePayrollPeriod(id, updates) {
+        const row = {};
+        if (updates.name !== undefined) row.name = updates.name;
+        if (updates.startDate !== undefined) row.start_date = updates.startDate;
+        if (updates.endDate !== undefined) row.end_date = updates.endDate;
+        if (updates.status !== undefined) row.status = updates.status;
+        const { error } = await _supabase.from('payroll_periods').update(row).eq('id', id);
+        if (error) throw error;
+    },
+    async closePayrollPeriod(id) {
+        const { error } = await _supabase.from('payroll_periods').update({ status: 'cerrado' }).eq('id', id);
+        if (error) throw error;
+    },
+    async deletePayrollPeriod(id) {
+        // Borrar entradas asociadas primero para respetar la FK
+        const { error: entriesError } = await _supabase.from('payroll_entries').delete().eq('period_id', id);
+        if (entriesError) throw entriesError;
+        const { error } = await _supabase.from('payroll_periods').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    // --- Payroll Entries (sueldo bruto por trabajador) ---
+    async getPayrollEntries(periodId) {
+        const { data, error } = await _supabase.from('payroll_entries').select('*').eq('period_id', periodId);
+        if (error) throw error;
+        return data.map(r => ({
+            id: r.id,
+            periodId: r.period_id,
+            worker: r.worker,
+            baseSalary: parseFloat(r.base_salary),
+            adjustments: parseFloat(r.adjustments),
+            notes: r.notes || ''
+        }));
+    },
+    async savePayrollEntry(entry) {
+        const { data: existing } = await _supabase
+            .from('payroll_entries')
+            .select('id')
+            .eq('period_id', entry.periodId)
+            .eq('worker', entry.worker)
+            .limit(1);
+        const row = {
+            period_id: entry.periodId,
+            worker: entry.worker,
+            base_salary: entry.baseSalary,
+            adjustments: entry.adjustments,
+            notes: entry.notes || ''
+        };
+        if (existing && existing.length > 0) {
+            const { error } = await _supabase.from('payroll_entries').update(row).eq('id', existing[0].id);
+            if (error) throw error;
+            return existing[0].id;
+        } else {
+            const { data, error } = await _supabase.from('payroll_entries').insert(row).select().single();
+            if (error) throw error;
+            return data.id;
+        }
     }
 };

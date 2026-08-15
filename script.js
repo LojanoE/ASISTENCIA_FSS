@@ -1,6 +1,7 @@
 // --- CONFIGURACIÓN ---
 const SESSION_KEY = 'attendance_session_v3';
 const DEVICE_WORKER_KEY = 'device_worker';
+const CONTADOR_PASSWORD = 'FINCASS';
 const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_settings_v3', 'attendance_fruit_v3'];
 
 // --- HELPERS ---
@@ -45,7 +46,8 @@ const views = {
     login: document.getElementById('view-login'),
     worker: document.getElementById('view-worker'),
     admin: document.getElementById('view-admin'),
-    fruit: document.getElementById('view-fruit')
+    fruit: document.getElementById('view-fruit'),
+    accounting: document.getElementById('view-accounting')
 };
 
 // Login
@@ -107,6 +109,45 @@ const fruitNationalCrates = document.getElementById('fruitNationalCrates');
 const fruitNationalObs = document.getElementById('fruitNationalObs');
 const fruitNationalEntriesBody = document.getElementById('fruitNationalEntriesBody');
 const fruitNationalTodaySummary = document.getElementById('fruitNationalTodaySummary');
+
+// Accounting View
+const accWorker = document.getElementById('accWorker');
+const accType = document.getElementById('accType');
+const accAmount = document.getElementById('accAmount');
+const accDate = document.getElementById('accDate');
+const accDescription = document.getElementById('accDescription');
+const btnAddTransaction = document.getElementById('btnAddTransaction');
+const accFilterFrom = document.getElementById('accFilterFrom');
+const accFilterTo = document.getElementById('accFilterTo');
+const accTransactionsBody = document.getElementById('accTransactionsBody');
+
+const accPeriodName = document.getElementById('accPeriodName');
+const accPeriodStart = document.getElementById('accPeriodStart');
+const accPeriodEnd = document.getElementById('accPeriodEnd');
+const btnAddPayrollPeriod = document.getElementById('btnAddPayrollPeriod');
+const accPeriodsList = document.getElementById('accPeriodsList');
+const accPayrollFormContainer = document.getElementById('accPayrollFormContainer');
+const accPayrollFormTitle = document.getElementById('accPayrollFormTitle');
+const accPayrollEntriesBody = document.getElementById('accPayrollEntriesBody');
+const btnSavePayrollEntries = document.getElementById('btnSavePayrollEntries');
+const btnClosePayrollPeriod = document.getElementById('btnClosePayrollPeriod');
+let currentPayrollPeriodId = null;
+
+const accReportPeriod = document.getElementById('accReportPeriod');
+const accReportBody = document.getElementById('accReportBody');
+const btnExportPayroll = document.getElementById('btnExportPayroll');
+const workerBalanceSummary = document.getElementById('workerBalanceSummary');
+
+// Modal de edición de movimiento
+const editTransactionModal = document.getElementById('editTransactionModal');
+const editTxWorker = document.getElementById('editTxWorker');
+const editTxType = document.getElementById('editTxType');
+const editTxAmount = document.getElementById('editTxAmount');
+const editTxDate = document.getElementById('editTxDate');
+const editTxDescription = document.getElementById('editTxDescription');
+const btnSaveTransactionEdit = document.getElementById('btnSaveTransactionEdit');
+const btnCancelTransactionEdit = document.getElementById('btnCancelTransactionEdit');
+let transactionToEditId = null;
 
 // Calendar
 const calendarWorker = document.getElementById('calendarWorker');
@@ -200,7 +241,32 @@ fruitDateFrom.addEventListener('change', () => renderFruitSummary());
 fruitDateTo.addEventListener('change', () => renderFruitSummary());
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => toggleFruitSubView(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+        const parent = btn.closest('section');
+        if (parent && parent.id === 'view-fruit') {
+            toggleFruitSubView(btn.dataset.tab);
+        } else if (parent && parent.id === 'view-accounting') {
+            toggleAccountingSubView(btn.dataset.tab);
+        }
+    });
+});
+
+// Accounting event listeners
+document.getElementById('btnAccounting').addEventListener('click', showAccountingView);
+document.getElementById('btnBackToAdminFromAccounting').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
+document.getElementById('btnLogoutAccounting').addEventListener('click', logout);
+btnAddTransaction.addEventListener('click', withLoading(btnAddTransaction, 'Registrando...', addTransaction));
+accFilterFrom.addEventListener('change', () => renderAccountingTransactions());
+accFilterTo.addEventListener('change', () => renderAccountingTransactions());
+btnAddPayrollPeriod.addEventListener('click', withLoading(btnAddPayrollPeriod, 'Creando...', addPayrollPeriod));
+btnSavePayrollEntries.addEventListener('click', withLoading(btnSavePayrollEntries, 'Guardando...', savePayrollEntries));
+btnClosePayrollPeriod.addEventListener('click', withLoading(btnClosePayrollPeriod, 'Cerrando...', closePayrollPeriod));
+accReportPeriod.addEventListener('change', () => renderPayrollReport());
+btnExportPayroll.addEventListener('click', withLoading(btnExportPayroll, 'Exportando...', exportPayrollExcel));
+btnSaveTransactionEdit.addEventListener('click', withLoading(btnSaveTransactionEdit, 'Guardando...', saveTransactionEdit));
+btnCancelTransactionEdit.addEventListener('click', () => {
+    editTransactionModal.classList.add('hidden');
+    transactionToEditId = null;
 });
 
 // Calendar event listeners
@@ -222,14 +288,21 @@ function initDateFilters() {
     const today = new Date().toISOString().split('T')[0];
     filterDateFrom.value = today;
     filterDateTo.value = today;
+    accDate.value = today;
+    initPayrollPeriodDefaults();
 }
 
 function togglePassVisibility() {
     if (loginUser.value === 'admin') {
         passContainer.classList.remove('hidden');
+        loginPass.placeholder = 'Contraseña';
+    } else if (loginUser.value === 'contador') {
+        passContainer.classList.remove('hidden');
+        loginPass.placeholder = 'Contraseña de contador';
     } else {
         passContainer.classList.add('hidden');
         loginPass.value = '';
+        loginPass.placeholder = 'Contraseña';
     }
 }
 
@@ -251,6 +324,14 @@ async function handleLogin() {
         } catch (err) {
             handleDbError(err);
         }
+    } else if (user === 'contador') {
+        if (loginPass.value === CONTADOR_PASSWORD) {
+            currentUser = { name: 'Contador', isAdmin: false, isAccountant: true };
+            saveSession(currentUser);
+            showAccountingView();
+        } else {
+            alert('Contraseña incorrecta');
+        }
     } else {
         currentUser = { name: user, isAdmin: false };
         saveSession(currentUser);
@@ -267,6 +348,8 @@ async function checkSession() {
         if (session.isAdmin) {
             showView('admin');
             await renderAdminDashboard();
+        } else if (session.isAccountant) {
+            showAccountingView();
         } else {
             showView('worker');
             await renderWorkerDashboard();
@@ -289,7 +372,7 @@ function saveSession(user) {
 }
 
 function logout() {
-    if (currentUser && !currentUser.isAdmin) {
+    if (currentUser && !currentUser.isAdmin && !currentUser.isAccountant) {
         const adminPass = prompt('Ingrese contraseña de administrador para cambiar de usuario:');
         if (adminPass === null) return;
         verifyAdminBeforeLogout(adminPass);
@@ -724,12 +807,14 @@ async function renderWorkerSelect() {
             loginUser.innerHTML = `
                 <option value="">-- Seleccione --</option>
                 <option value="admin">Administrador</option>
+                <option value="contador">Contador</option>
                 <option value="${escapeHTML(deviceWorker)}">${escapeHTML(deviceWorker)}</option>
             `;
         } else {
             loginUser.innerHTML = `
                 <option value="">-- Seleccione su nombre --</option>
                 <option value="admin">Administrador</option>
+                <option value="contador">Contador</option>
                 ${workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('')}
             `;
         }
@@ -748,7 +833,7 @@ async function renderWorkerDashboard() {
         const hasSalida = filtered.some(r => r.type === 'Salida');
         btnIn.disabled = hasEntrada;
         btnOut.disabled = hasSalida;
-        
+
         workerAttendanceBody.innerHTML = filtered.map(r => `
             <tr>
                 <td><strong>${r.type}</strong></td>
@@ -760,6 +845,8 @@ async function renderWorkerDashboard() {
                 <td><small>${escapeHTML(r.observation || '-')}</small></td>
             </tr>
         `).join('') || '<tr><td colspan="4" class="text-center">Sin registros hoy</td></tr>';
+
+        await renderWorkerBalance();
     } catch (err) {
         handleDbError(err);
     }
@@ -1195,6 +1282,532 @@ async function exportFruitExcel() {
         html += '</table>';
 
         downloadExcel(html, `fruta_${from}_al_${to}.xls`);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- LÓGICA DE CONTABILIDAD ---
+
+function showAccountingView() {
+    showView('accounting');
+    const isAccountantOnly = currentUser && currentUser.isAccountant;
+    document.getElementById('btnBackToAdminFromAccounting').classList.toggle('hidden', isAccountantOnly);
+    document.getElementById('btnLogoutAccounting').classList.toggle('hidden', !isAccountantOnly);
+    toggleAccountingSubView('accounting-transactions');
+}
+
+async function toggleAccountingSubView(tabId) {
+    document.querySelectorAll('#view-accounting .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    document.querySelectorAll('#view-accounting .tab-content').forEach(tc => {
+        tc.classList.toggle('hidden', tc.id !== tabId);
+    });
+    if (tabId === 'accounting-transactions') {
+        await renderAccountingTransactions();
+    } else if (tabId === 'accounting-periods') {
+        await renderPayrollPeriods();
+    } else if (tabId === 'accounting-report') {
+        await renderPayrollPeriodSelect();
+        await renderPayrollReport();
+    }
+}
+
+async function renderAccountingWorkerSelect() {
+    try {
+        const workers = await SupabaseDB.getWorkers();
+        const html = '<option value="">-- Seleccione --</option>' +
+            workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('');
+        accWorker.innerHTML = html;
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function addTransaction() {
+    const worker = accWorker.value;
+    const type = accType.value;
+    const amount = parseFloat(accAmount.value);
+    const date = accDate.value;
+    const description = accDescription.value.trim();
+
+    if (!worker) return alert('Seleccione un trabajador');
+    if (!date) return alert('Seleccione una fecha');
+    if (!amount || amount <= 0) return alert('Ingrese un monto válido mayor a 0');
+
+    try {
+        const periods = await SupabaseDB.getPayrollPeriods();
+        const closedPeriod = periods.find(p => p.status === 'cerrado' && date >= p.startDate && date <= p.endDate);
+        if (closedPeriod) {
+            return alert(`No se pueden agregar movimientos porque el período ${closedPeriod.name} ya está cerrado.`);
+        }
+
+        const newId = await SupabaseDB.addTransaction({
+            worker,
+            type,
+            amount,
+            date,
+            description,
+            createdBy: currentUser ? currentUser.name : 'contador'
+        });
+        accAmount.value = '';
+        accDescription.value = '';
+        await renderAccountingTransactions();
+        if (confirm('Movimiento registrado correctamente.\n¿Desea notificarlo por WhatsApp al trabajador?')) {
+            shareTransactionWhatsApp(newId);
+        }
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.deleteTransaction = async function(id) {
+    if (!confirm('¿Eliminar este movimiento?')) return;
+    try {
+        await SupabaseDB.deleteTransaction(id);
+        await renderAccountingTransactions();
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+async function renderAccountingTransactions() {
+    await renderAccountingWorkerSelect();
+    const today = todayStr();
+    if (!accFilterFrom.value) accFilterFrom.value = `${today.slice(0, 7)}-01`;
+    if (!accFilterTo.value) accFilterTo.value = today;
+
+    try {
+        const transactions = await SupabaseDB.getTransactions({
+            from: accFilterFrom.value,
+            to: accFilterTo.value
+        });
+
+        const typeLabels = {
+            adelanto: 'Adelanto',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamo / Avance',
+            otro_descuento: 'Otro descuento'
+        };
+
+        accTransactionsBody.innerHTML = transactions.map(t => `
+            <tr>
+                <td>${displayDate(t.date)}</td>
+                <td><strong>${escapeHTML(t.worker)}</strong></td>
+                <td>${typeLabels[t.type] || t.type}</td>
+                <td>$${t.amount.toFixed(2)}</td>
+                <td><small>${escapeHTML(t.description || '-')}</small></td>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-whatsapp-sm" onclick="shareTransactionWhatsApp(${t.id})" title="Notificar por WhatsApp">📲</button>
+                    <button class="btn btn-edit-sm" onclick="openEditTransactionModal(${t.id})">Editar</button>
+                    <button class="btn btn-danger-sm" onclick="deleteTransaction(${t.id})">X</button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" class="text-center">Sin movimientos en este rango</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- Edición de movimientos ---
+
+window.openEditTransactionModal = async function(id) {
+    try {
+        const transactions = await SupabaseDB.getTransactions();
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+
+        transactionToEditId = id;
+
+        const workers = await SupabaseDB.getWorkers();
+        editTxWorker.innerHTML = workers.map(w =>
+            `<option value="${escapeHTML(w.name)}" ${w.name === tx.worker ? 'selected' : ''}>${escapeHTML(w.name)}</option>`
+        ).join('');
+
+        editTxType.value = tx.type;
+        editTxAmount.value = tx.amount.toFixed(2);
+        editTxDate.value = tx.date;
+        editTxDescription.value = tx.description;
+        editTransactionModal.classList.remove('hidden');
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+async function saveTransactionEdit() {
+    const worker = editTxWorker.value;
+    const type = editTxType.value;
+    const amount = parseFloat(editTxAmount.value);
+    const date = editTxDate.value;
+    const description = editTxDescription.value.trim();
+
+    if (!worker) return alert('Seleccione un trabajador');
+    if (!date) return alert('Seleccione una fecha');
+    if (!amount || amount <= 0) return alert('Ingrese un monto válido mayor a 0');
+
+    try {
+        await SupabaseDB.updateTransaction(transactionToEditId, { worker, type, amount, date, description });
+        alert('Movimiento actualizado correctamente');
+        editTransactionModal.classList.add('hidden');
+        transactionToEditId = null;
+        await renderAccountingTransactions();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- Notificación por WhatsApp ---
+
+window.shareTransactionWhatsApp = async function(id) {
+    try {
+        const transactions = await SupabaseDB.getTransactions();
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+
+        const typeLabels = {
+            adelanto: 'Adelanto en efectivo',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamo / Avance',
+            otro_descuento: 'Otro descuento'
+        };
+
+        // Saldo acumulado del trabajador en el período que cubre esta fecha
+        let balanceLine = '';
+        const periods = await SupabaseDB.getPayrollPeriods();
+        const period = periods.find(p => tx.date >= p.startDate && tx.date <= p.endDate);
+        if (period) {
+            const workerTx = await SupabaseDB.getTransactions({
+                worker: tx.worker,
+                from: period.startDate,
+                to: period.endDate
+            });
+            const total = workerTx.reduce((s, t) => s + t.amount, 0);
+            balanceLine = `\nAcumulado del período (${period.name}): $${total.toFixed(2)}`;
+        }
+
+        const msg =
+`*MOVIMIENTO DE CUENTA - FSS*
+Fecha: ${displayDate(tx.date)}
+Trabajador: ${tx.worker}
+Tipo: ${typeLabels[tx.type] || tx.type}
+Monto: $${tx.amount.toFixed(2)}${tx.description ? `\nDetalle: ${tx.description}` : ''}${balanceLine}`;
+
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+// --- Períodos de Pago ---
+
+function initPayrollPeriodDefaults() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+    accPeriodName.value = `${monthName(now.getMonth())} ${y}`;
+    accPeriodStart.value = `${y}-${m}-01`;
+    accPeriodEnd.value = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+}
+
+function monthName(idx) {
+    const names = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return names[idx];
+}
+
+async function addPayrollPeriod() {
+    const name = accPeriodName.value.trim();
+    const startDate = accPeriodStart.value;
+    const endDate = accPeriodEnd.value;
+
+    if (!name || !startDate || !endDate) return alert('Complete todos los campos');
+    if (endDate < startDate) return alert('La fecha fin no puede ser anterior a la inicio');
+
+    try {
+        await SupabaseDB.addPayrollPeriod({ name, startDate, endDate, status: 'abierto' });
+        initPayrollPeriodDefaults();
+        await renderPayrollPeriods();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function renderPayrollPeriods() {
+    try {
+        const periods = await SupabaseDB.getPayrollPeriods();
+        if (periods.length === 0) {
+            accPeriodsList.innerHTML = '<p class="text-center" style="color: var(--text-muted);">No hay períodos creados</p>';
+            accPayrollFormContainer.classList.add('hidden');
+            return;
+        }
+
+        accPeriodsList.innerHTML = periods.map(p => `
+            <div class="period-row" style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; border-bottom:1px solid var(--border-color);">
+                <div>
+                    <strong>${escapeHTML(p.name)}</strong><br>
+                    <small>${displayDate(p.startDate)} al ${displayDate(p.endDate)} — <span class="badge ${p.status === 'abierto' ? 'bg-success' : 'bg-danger'}">${p.status.toUpperCase()}</span></small>
+                </div>
+                <div>
+                    <button class="btn btn-edit-sm" onclick="openPayrollForm(${p.id})">Sueldos</button>
+                    ${p.status === 'abierto' ? `<button class="btn btn-danger-sm" onclick="deletePayrollPeriod(${p.id})">Eliminar</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.openPayrollForm = async function(periodId) {
+    currentPayrollPeriodId = periodId;
+    try {
+        const period = await SupabaseDB.getPayrollPeriod(periodId);
+        const workers = await SupabaseDB.getWorkers();
+        const entries = await SupabaseDB.getPayrollEntries(periodId);
+        const entryMap = {};
+        entries.forEach(e => { entryMap[e.worker] = e; });
+
+        accPayrollFormTitle.textContent = period.name;
+        accPayrollFormContainer.classList.remove('hidden');
+
+        accPayrollEntriesBody.innerHTML = workers.map(w => {
+            const e = entryMap[w.name] || { baseSalary: 0, adjustments: 0, notes: '' };
+            return `
+                <tr data-worker="${escapeHTML(w.name)}">
+                    <td><strong>${escapeHTML(w.name)}</strong></td>
+                    <td><input type="number" class="payroll-base" data-worker="${escapeHTML(w.name)}" value="${e.baseSalary.toFixed(2)}" step="0.01" min="0" style="width: 7rem;"></td>
+                    <td><input type="number" class="payroll-adj" data-worker="${escapeHTML(w.name)}" value="${e.adjustments.toFixed(2)}" step="0.01" style="width: 7rem;"></td>
+                    <td><input type="text" class="payroll-notes" data-worker="${escapeHTML(w.name)}" value="${escapeHTML(e.notes)}" style="width: 100%;"></td>
+                </tr>
+            `;
+        }).join('');
+
+        if (period.status === 'cerrado') {
+            accPayrollEntriesBody.querySelectorAll('input').forEach(i => i.disabled = true);
+            btnSavePayrollEntries.classList.add('hidden');
+            btnClosePayrollPeriod.classList.add('hidden');
+        } else {
+            accPayrollEntriesBody.querySelectorAll('input').forEach(i => i.disabled = false);
+            btnSavePayrollEntries.classList.remove('hidden');
+            btnClosePayrollPeriod.classList.remove('hidden');
+        }
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+async function savePayrollEntries() {
+    if (!currentPayrollPeriodId) return;
+    try {
+        const rows = accPayrollEntriesBody.querySelectorAll('tr[data-worker]');
+        for (const row of rows) {
+            const worker = row.getAttribute('data-worker');
+            const base = parseFloat(row.querySelector('.payroll-base').value) || 0;
+            const adj = parseFloat(row.querySelector('.payroll-adj').value) || 0;
+            const notes = row.querySelector('.payroll-notes').value.trim();
+            await SupabaseDB.savePayrollEntry({
+                periodId: currentPayrollPeriodId,
+                worker,
+                baseSalary: base,
+                adjustments: adj,
+                notes
+            });
+        }
+        alert('Sueldos guardados correctamente');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function closePayrollPeriod() {
+    if (!currentPayrollPeriodId) return;
+    if (!confirm('¿Cerrar el período? Una vez cerrado no se podrán agregar más movimientos en esas fechas.')) return;
+    try {
+        await savePayrollEntries();
+        await SupabaseDB.closePayrollPeriod(currentPayrollPeriodId);
+        await renderPayrollPeriods();
+        await openPayrollForm(currentPayrollPeriodId);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.deletePayrollPeriod = async function(id) {
+    if (!confirm('¿Eliminar este período y todos sus sueldos asociados?')) return;
+    try {
+        await SupabaseDB.deletePayrollPeriod(id);
+        if (currentPayrollPeriodId === id) {
+            currentPayrollPeriodId = null;
+            accPayrollFormContainer.classList.add('hidden');
+        }
+        await renderPayrollPeriods();
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+// --- Reporte de Corte ---
+
+async function renderPayrollPeriodSelect() {
+    try {
+        const periods = await SupabaseDB.getPayrollPeriods();
+        accReportPeriod.innerHTML = periods.map(p =>
+            `<option value="${p.id}">${escapeHTML(p.name)} (${displayDate(p.startDate)} - ${displayDate(p.endDate)})</option>`
+        ).join('');
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function renderPayrollReport() {
+    const periodId = parseInt(accReportPeriod.value, 10);
+    if (!periodId) {
+        accReportBody.innerHTML = '<tr><td colspan="10" class="text-center">Seleccione un período</td></tr>';
+        return;
+    }
+
+    try {
+        const period = await SupabaseDB.getPayrollPeriod(periodId);
+        const workers = await SupabaseDB.getWorkers();
+        const transactions = await SupabaseDB.getTransactions({
+            from: period.startDate,
+            to: period.endDate
+        });
+        const entries = await SupabaseDB.getPayrollEntries(periodId);
+        const entryMap = {};
+        entries.forEach(e => { entryMap[e.worker] = e; });
+
+        const typeLabels = {
+            adelanto: 'Adelanto',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamo / Avance',
+            otro_descuento: 'Otro descuento'
+        };
+
+        let html = '';
+        workers.forEach(w => {
+            const workerTx = transactions.filter(t => t.worker === w.name);
+            const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
+            workerTx.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
+
+            const entry = entryMap[w.name] || { baseSalary: 0, adjustments: 0 };
+            const totalDesc = byType.adelanto + byType.viveres + byType.prestamo + byType.otro_descuento;
+            const neto = entry.baseSalary + entry.adjustments - totalDesc;
+            const estado = neto >= 0
+                ? `<span class="badge bg-success">A favor: $${neto.toFixed(2)}</span>`
+                : `<span class="badge bg-danger">Debe: $${Math.abs(neto).toFixed(2)}</span>`;
+
+            html += `
+                <tr>
+                    <td><strong>${escapeHTML(w.name)}</strong></td>
+                    <td>$${entry.baseSalary.toFixed(2)}</td>
+                    <td>$${entry.adjustments.toFixed(2)}</td>
+                    <td>$${byType.adelanto.toFixed(2)}</td>
+                    <td>$${byType.viveres.toFixed(2)}</td>
+                    <td>$${byType.prestamo.toFixed(2)}</td>
+                    <td>$${byType.otro_descuento.toFixed(2)}</td>
+                    <td><strong>$${totalDesc.toFixed(2)}</strong></td>
+                    <td><strong>$${neto.toFixed(2)}</strong></td>
+                    <td>${estado}</td>
+                </tr>
+            `;
+        });
+
+        accReportBody.innerHTML = html || '<tr><td colspan="10" class="text-center">No hay trabajadores registrados</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function exportPayrollExcel() {
+    const periodId = parseInt(accReportPeriod.value, 10);
+    if (!periodId) return alert('Seleccione un período');
+
+    try {
+        const period = await SupabaseDB.getPayrollPeriod(periodId);
+        const workers = await SupabaseDB.getWorkers();
+        const transactions = await SupabaseDB.getTransactions({
+            from: period.startDate,
+            to: period.endDate
+        });
+        const entries = await SupabaseDB.getPayrollEntries(periodId);
+        const entryMap = {};
+        entries.forEach(e => { entryMap[e.worker] = e; });
+
+        const hdrStyle = 'style="background-color:#2563eb;color:white;font-weight:bold;"';
+        let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
+        html += `<tr ${hdrStyle}><td>Trabajador</td><td>Sueldo Bruto</td><td>Ajustes</td><td>Adelantos</td><td>Viveres</td><td>Prestamos</td><td>Otros Desc.</td><td>Total Desc.</td><td>Neto</td><td>Estado</td></tr>`;
+
+        workers.forEach(w => {
+            const workerTx = transactions.filter(t => t.worker === w.name);
+            const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
+            workerTx.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
+            const entry = entryMap[w.name] || { baseSalary: 0, adjustments: 0 };
+            const totalDesc = byType.adelanto + byType.viveres + byType.prestamo + byType.otro_descuento;
+            const neto = entry.baseSalary + entry.adjustments - totalDesc;
+            const estado = neto >= 0 ? `A favor: $${neto.toFixed(2)}` : `Debe: $${Math.abs(neto).toFixed(2)}`;
+
+            html += `<tr><td>${escapeHTML(w.name)}</td><td>${entry.baseSalary.toFixed(2)}</td><td>${entry.adjustments.toFixed(2)}</td><td>${byType.adelanto.toFixed(2)}</td><td>${byType.viveres.toFixed(2)}</td><td>${byType.prestamo.toFixed(2)}</td><td>${byType.otro_descuento.toFixed(2)}</td><td>${totalDesc.toFixed(2)}</td><td>${neto.toFixed(2)}</td><td>${estado}</td></tr>`;
+        });
+
+        html += '</table>';
+        downloadExcel(html, `corte_${period.name.replace(/\s+/g, '_')}.xls`);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- Saldo del trabajador en vista worker ---
+
+async function renderWorkerBalance() {
+    if (!workerBalanceSummary) return;
+    if (!currentUser || currentUser.isAdmin) {
+        workerBalanceSummary.innerHTML = '';
+        return;
+    }
+
+    try {
+        const periods = await SupabaseDB.getPayrollPeriods();
+        const period = periods.find(p => p.status === 'abierto') || periods[0];
+        if (!period) {
+            workerBalanceSummary.innerHTML = '<p class="text-center" style="color: var(--text-muted);">No hay períodos de pago configurados</p>';
+            return;
+        }
+
+        const transactions = await SupabaseDB.getTransactions({
+            worker: currentUser.name,
+            from: period.startDate,
+            to: period.endDate
+        });
+        const entries = await SupabaseDB.getPayrollEntries(period.id);
+        const entry = entries.find(e => e.worker === currentUser.name) || { baseSalary: 0, adjustments: 0 };
+
+        const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
+        transactions.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
+        const totalDesc = byType.adelanto + byType.viveres + byType.prestamo + byType.otro_descuento;
+        const neto = entry.baseSalary + entry.adjustments - totalDesc;
+
+        const typeLabels = {
+            adelanto: 'Adelantos',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamos / Avances',
+            otro_descuento: 'Otros descuentos'
+        };
+
+        workerBalanceSummary.innerHTML = `
+            <p style="margin-bottom: 0.5rem;"><strong>Período:</strong> ${escapeHTML(period.name)}</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="balance-item"><small>Sueldo Bruto</small><div>$${entry.baseSalary.toFixed(2)}</div></div>
+                ${Object.keys(typeLabels).map(k => `
+                    <div class="balance-item"><small>${typeLabels[k]}</small><div>$${byType[k].toFixed(2)}</div></div>
+                `).join('')}
+            </div>
+            <div class="balance-total" style="text-align: center; padding: 1rem; border-radius: 0.75rem; background: ${neto >= 0 ? 'var(--success)' : 'var(--danger)'}; color: white;">
+                <strong>${neto >= 0 ? 'A TU FAVOR' : 'DEBES A LA EMPRESA'}</strong>
+                <div style="font-size: 1.5rem; font-weight: bold;">$${Math.abs(neto).toFixed(2)}</div>
+            </div>
+        `;
     } catch (err) {
         handleDbError(err);
     }

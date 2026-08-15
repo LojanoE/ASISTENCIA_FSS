@@ -67,6 +67,13 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="card">
+                    <h2>💰 Mi Saldo del Período</h2>
+                    <div id="workerBalanceSummary">
+                        <p class="text-center" style="color: var(--text-muted);">Cargando...</p>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -76,6 +83,7 @@
                 <div class="header-flex">
                     <h1>Panel Administrador</h1>
                     <div class="header-actions">
+                        <button id="btnAccounting" class="btn btn-outline-sm">💰 Contabilidad</button>
                         <button id="btnFruit" class="btn btn-outline-sm">🧺 Envío de Fruta</button>
                         <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
                     </div>
@@ -313,6 +321,172 @@
                 </div>
             </div>
         </section>
+
+        <!-- VISTA: CONTABILIDAD -->
+        <section id="view-accounting" class="view hidden">
+            <header>
+                <div class="header-flex">
+                    <h1>💰 Contabilidad</h1>
+                    <div class="header-actions">
+                        <button id="btnBackToAdminFromAccounting" class="btn btn-outline-sm">Volver al Panel</button>
+                        <button id="btnLogoutAccounting" class="btn btn-outline-sm hidden">Cerrar Sesión</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="accounting-transactions">Movimientos</button>
+                <button class="tab-btn" data-tab="accounting-periods">Cierre de Pago</button>
+                <button class="tab-btn" data-tab="accounting-report">Reporte</button>
+            </div>
+
+            <!-- TAB: Movimientos -->
+            <div id="accounting-transactions" class="tab-content">
+                <div class="card">
+                    <h2>Registrar Movimiento</h2>
+                    <div class="form-group">
+                        <label for="accWorker">Trabajador</label>
+                        <select id="accWorker"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="accType">Tipo</label>
+                        <select id="accType">
+                            <option value="adelanto">Adelanto en efectivo</option>
+                            <option value="viveres">Víveres / Raciones</option>
+                            <option value="prestamo">Préstamo / Avance</option>
+                            <option value="otro_descuento">Otro descuento</option>
+                        </select>
+                    </div>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="accAmount">Monto ($)</label>
+                            <input type="number" id="accAmount" placeholder="0.00" min="0.01" step="0.01" inputmode="decimal">
+                        </div>
+                        <div class="form-group">
+                            <label for="accDate">Fecha</label>
+                            <input type="date" id="accDate">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="accDescription">Descripción / Observación</label>
+                        <input type="text" id="accDescription" placeholder="Opcional">
+                    </div>
+                    <button id="btnAddTransaction" class="btn btn-primary w-full">Registrar Movimiento</button>
+                </div>
+
+                <div class="card full-width">
+                    <h2>Movimientos Recientes</h2>
+                    <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <div class="form-inline" style="margin-bottom: 0;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Desde:</label>
+                                <input type="date" id="accFilterFrom" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Hasta:</label>
+                                <input type="date" id="accFilterTo" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Trabajador</th>
+                                    <th>Tipo</th>
+                                    <th>Monto</th>
+                                    <th>Descripción</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="accTransactionsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Cierre de Pago -->
+            <div id="accounting-periods" class="tab-content hidden">
+                <div class="card">
+                    <h2>Nuevo Período de Pago</h2>
+                    <div class="form-group">
+                        <label for="accPeriodName">Nombre (ej. Agosto 2026)</label>
+                        <input type="text" id="accPeriodName" placeholder="Nombre del período">
+                    </div>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="accPeriodStart">Fecha inicio</label>
+                            <input type="date" id="accPeriodStart">
+                        </div>
+                        <div class="form-group">
+                            <label for="accPeriodEnd">Fecha fin</label>
+                            <input type="date" id="accPeriodEnd">
+                        </div>
+                    </div>
+                    <button id="btnAddPayrollPeriod" class="btn btn-primary w-full">Crear Período</button>
+                </div>
+
+                <div class="card full-width">
+                    <h2>Períodos Existentes</h2>
+                    <div id="accPeriodsList"></div>
+                </div>
+
+                <div id="accPayrollFormContainer" class="card full-width hidden">
+                    <h2>Ingresar Sueldos — <span id="accPayrollFormTitle"></span></h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Trabajador</th>
+                                    <th>Sueldo Bruto</th>
+                                    <th>Ajustes (+/-)</th>
+                                    <th>Notas</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accPayrollEntriesBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="button-group-vertical" style="margin-top: 1rem;">
+                        <button id="btnSavePayrollEntries" class="btn btn-primary">Guardar Sueldos</button>
+                        <button id="btnClosePayrollPeriod" class="btn btn-secondary">Cerrar Período</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Reporte -->
+            <div id="accounting-report" class="tab-content hidden">
+                <div class="card full-width">
+                    <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <h2>Reporte de Corte</h2>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="accReportPeriod" style="margin-bottom: 0; font-size: 0.7rem;">Período:</label>
+                            <select id="accReportPeriod" style="padding: 0.4rem; font-size: 0.8rem;"></select>
+                        </div>
+                        <button id="btnExportPayroll" class="btn btn-outline">Exportar Excel</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Trabajador</th>
+                                    <th>Sueldo Bruto</th>
+                                    <th>Ajustes</th>
+                                    <th>Adelantos</th>
+                                    <th>Víveres</th>
+                                    <th>Préstamos</th>
+                                    <th>Otros Desc.</th>
+                                    <th>Total Desc.</th>
+                                    <th>Neto</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accReportBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- MODAL DE EDICIÓN (ADMIN) -->
@@ -364,6 +538,44 @@
             <div class="button-group-vertical">
                 <button id="btnSaveRecord" class="btn btn-primary">Guardar Registro</button>
                 <button id="btnCancelRecord" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDICIÓN DE MOVIMIENTO (CONTADOR) -->
+    <div id="editTransactionModal" class="modal hidden">
+        <div class="modal-content card">
+            <h2>Editar Movimiento</h2>
+            <div class="form-group">
+                <label for="editTxWorker">Trabajador</label>
+                <select id="editTxWorker"></select>
+            </div>
+            <div class="form-group">
+                <label for="editTxType">Tipo</label>
+                <select id="editTxType">
+                    <option value="adelanto">Adelanto en efectivo</option>
+                    <option value="viveres">Víveres / Raciones</option>
+                    <option value="prestamo">Préstamo / Avance</option>
+                    <option value="otro_descuento">Otro descuento</option>
+                </select>
+            </div>
+            <div class="fruit-row">
+                <div class="form-group">
+                    <label for="editTxAmount">Monto ($)</label>
+                    <input type="number" id="editTxAmount" min="0.01" step="0.01" inputmode="decimal">
+                </div>
+                <div class="form-group">
+                    <label for="editTxDate">Fecha</label>
+                    <input type="date" id="editTxDate">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="editTxDescription">Descripción / Observación</label>
+                <input type="text" id="editTxDescription" placeholder="Opcional">
+            </div>
+            <div class="button-group-vertical">
+                <button id="btnSaveTransactionEdit" class="btn btn-primary">Guardar Cambios</button>
+                <button id="btnCancelTransactionEdit" class="btn btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
