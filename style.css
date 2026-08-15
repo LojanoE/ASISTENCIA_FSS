@@ -37,6 +37,7 @@ body {
     flex-direction: column;
     align-items: center;
     width: 100%;
+    min-width: 0; /* Permite que el contenido se encoja en móvil */
 }
 
 .hidden { display: none !important; }
@@ -69,6 +70,7 @@ header {
     margin-bottom: 1.5rem;
     width: 100%;
     text-align: center;
+    min-width: 0; /* Evita que la tarjeta crezca más que la pantalla */
 }
 
 h2 {
@@ -174,8 +176,15 @@ h2 {
 /* Tablas optimizadas para móvil */
 .table-container { 
     width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     border-radius: 0.5rem;
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+}
+
+.tab-content {
+    width: 100%;
+    min-width: 0;
 }
 
 table { 
@@ -561,11 +570,17 @@ textarea:focus {
 
 /* Mobile-friendly adjustments for accounting (Android/iOS) */
 @media (max-width: 768px) {
-    #view-accounting {
-        padding: 0 0.25rem;
+    body {
+        padding: 0.5rem; /* Más espacio útil en pantallas pequeñas */
+    }
+    #view-accounting,
+    #view-accounting .container {
+        max-width: 100%;
+        padding: 0;
     }
     #view-accounting .card {
         padding: 1rem;
+        border-radius: 0.9rem;
     }
     #view-accounting table {
         font-size: 0.75rem;
