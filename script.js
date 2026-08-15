@@ -137,6 +137,9 @@ const accReportPeriod = document.getElementById('accReportPeriod');
 const accReportBody = document.getElementById('accReportBody');
 const btnExportPayroll = document.getElementById('btnExportPayroll');
 const workerBalanceSummary = document.getElementById('workerBalanceSummary');
+const workerTransactionsBody = document.getElementById('workerTransactionsBody');
+const workerBalanceFrom = document.getElementById('workerBalanceFrom');
+const workerBalanceTo = document.getElementById('workerBalanceTo');
 
 // Modal de edición de movimiento
 const editTransactionModal = document.getElementById('editTransactionModal');
@@ -263,6 +266,8 @@ btnSavePayrollEntries.addEventListener('click', withLoading(btnSavePayrollEntrie
 btnClosePayrollPeriod.addEventListener('click', withLoading(btnClosePayrollPeriod, 'Cerrando...', closePayrollPeriod));
 accReportPeriod.addEventListener('change', () => renderPayrollReport());
 btnExportPayroll.addEventListener('click', withLoading(btnExportPayroll, 'Exportando...', exportPayrollExcel));
+workerBalanceFrom.addEventListener('change', () => renderWorkerBalance());
+workerBalanceTo.addEventListener('change', () => renderWorkerBalance());
 btnSaveTransactionEdit.addEventListener('click', withLoading(btnSaveTransactionEdit, 'Guardando...', saveTransactionEdit));
 btnCancelTransactionEdit.addEventListener('click', () => {
     editTransactionModal.classList.add('hidden');
@@ -1764,50 +1769,60 @@ async function renderWorkerBalance() {
     if (!workerBalanceSummary) return;
     if (!currentUser || currentUser.isAdmin) {
         workerBalanceSummary.innerHTML = '';
+        workerTransactionsBody.innerHTML = '';
         return;
     }
 
-    try {
-        const periods = await SupabaseDB.getPayrollPeriods();
-        const period = periods.find(p => p.status === 'abierto') || periods[0];
-        if (!period) {
-            workerBalanceSummary.innerHTML = '<p class="text-center" style="color: var(--text-muted);">No hay períodos de pago configurados</p>';
-            return;
-        }
+    const today = todayStr();
+    if (!workerBalanceFrom.value) workerBalanceFrom.value = `${today.slice(0, 7)}-01`;
+    if (!workerBalanceTo.value) workerBalanceTo.value = today;
 
+    const from = workerBalanceFrom.value;
+    const to = workerBalanceTo.value;
+
+    try {
         const transactions = await SupabaseDB.getTransactions({
             worker: currentUser.name,
-            from: period.startDate,
-            to: period.endDate
+            from,
+            to
         });
-        const entries = await SupabaseDB.getPayrollEntries(period.id);
-        const entry = entries.find(e => e.worker === currentUser.name) || { baseSalary: 0, adjustments: 0 };
+
+        const typeLabels = {
+            adelanto: 'Adelanto',
+            viveres: 'Víveres / Raciones',
+            prestamo: 'Préstamo / Avance',
+            otro_descuento: 'Otro descuento'
+        };
 
         const byType = { adelanto: 0, viveres: 0, prestamo: 0, otro_descuento: 0 };
         transactions.forEach(t => { byType[t.type] = (byType[t.type] || 0) + t.amount; });
-        const totalDesc = byType.adelanto + byType.viveres + byType.prestamo + byType.otro_descuento;
-        const neto = entry.baseSalary + entry.adjustments - totalDesc;
-
-        const typeLabels = {
-            adelanto: 'Adelantos',
-            viveres: 'Víveres / Raciones',
-            prestamo: 'Préstamos / Avances',
-            otro_descuento: 'Otros descuentos'
-        };
+        const totalDesc = byType.viveres + byType.prestamo + byType.otro_descuento;
+        const neto = byType.adelanto - totalDesc; // Los adelantos son dinero entregado; los demás son cargos
 
         workerBalanceSummary.innerHTML = `
-            <p style="margin-bottom: 0.5rem;"><strong>Período:</strong> ${escapeHTML(period.name)}</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
-                <div class="balance-item"><small>Sueldo Bruto</small><div>$${entry.baseSalary.toFixed(2)}</div></div>
-                ${Object.keys(typeLabels).map(k => `
-                    <div class="balance-item"><small>${typeLabels[k]}</small><div>$${byType[k].toFixed(2)}</div></div>
-                `).join('')}
+            <p style="margin-bottom: 0.5rem;"><strong>Rango:</strong> ${displayDate(from)} al ${displayDate(to)}</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-bottom: 1rem;">
+                <div class="balance-item"><small>Adelantos</small><div>$${byType.adelanto.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Víveres</small><div>$${byType.viveres.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Préstamos</small><div>$${byType.prestamo.toFixed(2)}</div></div>
+                <div class="balance-item"><small>Otros desc.</small><div>$${byType.otro_descuento.toFixed(2)}</div></div>
             </div>
             <div class="balance-total" style="text-align: center; padding: 1rem; border-radius: 0.75rem; background: ${neto >= 0 ? 'var(--success)' : 'var(--danger)'}; color: white;">
-                <strong>${neto >= 0 ? 'A TU FAVOR' : 'DEBES A LA EMPRESA'}</strong>
-                <div style="font-size: 1.5rem; font-weight: bold;">$${Math.abs(neto).toFixed(2)}</div>
+                <strong>${neto >= 0 ? 'ADELANTOS NETOS' : 'CARGOS NETOS'}</strong>
+                <div style="font-size: 1.25rem; font-weight: bold;">$${Math.abs(neto).toFixed(2)}</div>
             </div>
         `;
+
+        workerTransactionsBody.innerHTML = transactions.length
+            ? transactions.map(t => `
+                <tr>
+                    <td>${displayDate(t.date)}</td>
+                    <td>${typeLabels[t.type] || t.type}</td>
+                    <td>$${t.amount.toFixed(2)}</td>
+                    <td><small>${escapeHTML(t.description || '-')}</small></td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="4" class="text-center">Sin movimientos en este rango</td></tr>';
     } catch (err) {
         handleDbError(err);
     }

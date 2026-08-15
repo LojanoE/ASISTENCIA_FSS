@@ -77,7 +77,7 @@ Legend (in order of priority for display):
 - `addPayrollPeriod()`, `renderPayrollPeriods()`, `closePayrollPeriod()` — manage monthly payroll periods
 - `savePayrollEntries()` — saves `base_salary`/`adjustments` per worker for the selected period
 - `renderPayrollReport()`, `exportPayrollExcel()` — calculate and export net balances
-- `renderWorkerBalance()` — shows the current worker's balance summary on the worker view
+- `renderWorkerBalance()` — shows the current worker's balance summary and a detailed transaction list for a selectable date range (default current month)
 
 ## Supabase Schema
 - Fresh install: run `supabase-setup.sql` (idempotent: `create table if not exists`, conditional settings insert, policies dropped and recreated)

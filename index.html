@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistencia FSS - Control de Horarios</title>
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <div class="container">
@@ -69,9 +69,34 @@
                 </div>
 
                 <div class="card">
-                    <h2>💰 Mi Saldo del Período</h2>
+                    <h2>💰 Mi Saldo</h2>
                     <div id="workerBalanceSummary">
                         <p class="text-center" style="color: var(--text-muted);">Cargando...</p>
+                    </div>
+
+                    <div class="worker-balance-filters">
+                        <div class="form-group" style="margin-bottom: 0.5rem;">
+                            <label for="workerBalanceFrom" style="font-size: 0.75rem;">Desde</label>
+                            <input type="date" id="workerBalanceFrom">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0.5rem;">
+                            <label for="workerBalanceTo" style="font-size: 0.75rem;">Hasta</label>
+                            <input type="date" id="workerBalanceTo">
+                        </div>
+                    </div>
+
+                    <div class="table-container" style="margin-top: 1rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Monto</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workerTransactionsBody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -581,7 +606,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabaseClient.js?v=4"></script>
-    <script src="script.js?v=4"></script>
+    <script src="supabaseClient.js?v=5"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>
