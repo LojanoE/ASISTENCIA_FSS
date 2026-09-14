@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistencia FSS - Control de Horarios</title>
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
     <div class="container">
@@ -110,6 +110,7 @@
                     <div class="header-actions">
                         <button id="btnAccounting" class="btn btn-outline-sm">💰 Contabilidad</button>
                         <button id="btnFruit" class="btn btn-outline-sm">🧺 Envío de Fruta</button>
+                        <button id="btnWarehouse" class="btn btn-outline-sm">🧰 Bodega</button>
                         <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
                     </div>
                 </div>
@@ -559,6 +560,192 @@
                 </div>
             </div>
         </section>
+
+        <!-- VISTA: BODEGA (HERRAMIENTAS Y EQUIPOS) -->
+        <section id="view-warehouse" class="view hidden">
+            <header>
+                <div class="header-flex">
+                    <h1>🧰 Bodega</h1>
+                    <div class="header-actions">
+                        <button id="btnBackToAdminFromWarehouse" class="btn btn-outline-sm">Volver al Panel</button>
+                        <button id="btnLogoutWarehouse" class="btn btn-outline-sm hidden">Cerrar Sesión</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="warehouse-out">Salida</button>
+                <button class="tab-btn" data-tab="warehouse-return">Retorno</button>
+                <button class="tab-btn" data-tab="warehouse-inventory">Inventario</button>
+                <button class="tab-btn" data-tab="warehouse-log">Registro</button>
+            </div>
+
+            <!-- TAB: Salida -->
+            <div id="warehouse-out" class="tab-content">
+                <div class="card">
+                    <h2>Salida a la Finca</h2>
+                    <div class="form-group">
+                        <label for="toolLoanWorker">Trabajador</label>
+                        <select id="toolLoanWorker"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolLoanTool">Herramienta / Equipo</label>
+                        <select id="toolLoanTool"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolLoanQty">Cantidad</label>
+                        <input type="number" id="toolLoanQty" value="1" min="1" inputmode="numeric">
+                    </div>
+                    <div class="form-group">
+                        <label for="toolLoanObs">Observación</label>
+                        <input type="text" id="toolLoanObs" placeholder="Opcional (ej. lote, labor)">
+                    </div>
+                    <button id="btnAddToolLoan" class="btn btn-primary w-full">Registrar Salida</button>
+                </div>
+
+                <div class="card full-width">
+                    <h2>Salidas de Hoy</h2>
+                    <div class="fruit-today-summary" id="toolTodaySummary"></div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Trabajador</th>
+                                    <th>Herramienta / Equipo</th>
+                                    <th>Cant.</th>
+                                    <th>H. salida</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="toolTodayBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Retorno -->
+            <div id="warehouse-return" class="tab-content hidden">
+                <div class="card full-width">
+                    <h2>En Campo — Pendientes de Retorno</h2>
+                    <div class="form-group">
+                        <label for="toolPendingWorker">Trabajador</label>
+                        <select id="toolPendingWorker"></select>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Trabajador</th>
+                                    <th>Herramienta / Equipo</th>
+                                    <th>Cant.</th>
+                                    <th>H. salida</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="toolPendingBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Inventario -->
+            <div id="warehouse-inventory" class="tab-content hidden">
+                <div class="card">
+                    <h2>Nueva Herramienta / Equipo</h2>
+                    <div class="form-group">
+                        <label for="toolName">Nombre</label>
+                        <input type="text" id="toolName" placeholder="Ej. Machete, Bomba de mochila">
+                    </div>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="toolCategory">Tipo</label>
+                            <select id="toolCategory">
+                                <option value="herramienta">Herramienta</option>
+                                <option value="equipo">Equipo</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="toolTotalQty">Cantidad total</label>
+                            <input type="number" id="toolTotalQty" value="1" min="1" inputmode="numeric">
+                        </div>
+                    </div>
+                    <button id="btnAddTool" class="btn btn-primary w-full">Agregar al Inventario</button>
+                </div>
+
+                <div class="card full-width">
+                    <h2>Inventario</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Tipo</th>
+                                    <th>Total</th>
+                                    <th>En campo</th>
+                                    <th>Disponible</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="toolInventoryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Registro -->
+            <div id="warehouse-log" class="tab-content hidden">
+                <div class="card full-width">
+                    <div class="log-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <h2>Registro R019</h2>
+                        <div class="form-inline" style="margin-bottom: 0;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Desde:</label>
+                                <input type="date" id="toolLogFrom" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="margin-bottom: 0; font-size: 0.7rem;">Hasta:</label>
+                                <input type="date" id="toolLogTo" style="padding: 0.4rem; font-size: 0.8rem;">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="toolLogWorker" style="margin-bottom: 0; font-size: 0.7rem;">Trabajador:</label>
+                            <select id="toolLogWorker" style="padding: 0.4rem; font-size: 0.8rem;"></select>
+                        </div>
+                        <button id="btnExportToolLog" class="btn btn-outline">Exportar Excel</button>
+                    </div>
+                    <div class="fruit-row" style="margin-top: 1rem;">
+                        <div class="form-group">
+                            <label for="toolLogFinca">Finca (encabezado)</label>
+                            <input type="text" id="toolLogFinca" placeholder="Nombre de la finca">
+                        </div>
+                        <div class="form-group">
+                            <label for="toolLogResponsable">Responsable (encabezado)</label>
+                            <input type="text" id="toolLogResponsable" placeholder="Nombre del responsable">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Trabajador</th>
+                                    <th>Herramienta / Equipo</th>
+                                    <th>Tipo</th>
+                                    <th>Cant.</th>
+                                    <th>H. salida</th>
+                                    <th>H. retorno</th>
+                                    <th>Cant. dev.</th>
+                                    <th>Estado</th>
+                                    <th>Observación</th>
+                                </tr>
+                            </thead>
+                            <tbody id="toolLogBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- MODAL DE EDICIÓN (ADMIN) -->
@@ -652,8 +839,66 @@
         </div>
     </div>
 
+    <!-- MODAL DE RETORNO DE HERRAMIENTA (BODEGA) -->
+    <div id="returnToolModal" class="modal hidden">
+        <div class="modal-content card">
+            <h2>Registrar Retorno</h2>
+            <p id="returnToolInfo" style="margin-bottom: 1rem; color: var(--text-muted);"></p>
+            <div class="fruit-row">
+                <div class="form-group">
+                    <label for="returnToolQty">Cantidad devuelta</label>
+                    <input type="number" id="returnToolQty" min="0" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="returnToolStatus">Estado</label>
+                    <select id="returnToolStatus">
+                        <option value="Bueno">Bueno</option>
+                        <option value="Dañado">Dañado</option>
+                        <option value="Perdido">Perdido</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="returnToolObs">Observación</label>
+                <input type="text" id="returnToolObs" placeholder="Opcional">
+            </div>
+            <div class="button-group-vertical">
+                <button id="btnSaveToolReturn" class="btn btn-primary">Guardar Retorno</button>
+                <button id="btnCancelToolReturn" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDICIÓN DE HERRAMIENTA (BODEGA) -->
+    <div id="editToolModal" class="modal hidden">
+        <div class="modal-content card">
+            <h2>Editar Herramienta / Equipo</h2>
+            <div class="form-group">
+                <label for="editToolName">Nombre</label>
+                <input type="text" id="editToolName">
+            </div>
+            <div class="fruit-row">
+                <div class="form-group">
+                    <label for="editToolCategory">Tipo</label>
+                    <select id="editToolCategory">
+                        <option value="herramienta">Herramienta</option>
+                        <option value="equipo">Equipo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editToolTotalQty">Cantidad total</label>
+                    <input type="number" id="editToolTotalQty" min="0" inputmode="numeric">
+                </div>
+            </div>
+            <div class="button-group-vertical">
+                <button id="btnSaveToolEdit" class="btn btn-primary">Guardar Cambios</button>
+                <button id="btnCancelToolEdit" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabaseClient.js?v=6"></script>
-    <script src="script.js?v=6"></script>
+    <script src="supabaseClient.js?v=7"></script>
+    <script src="script.js?v=7"></script>
 </body>
 </html>

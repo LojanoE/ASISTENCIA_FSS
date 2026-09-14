@@ -157,6 +157,7 @@ h2 {
 .bg-success { background: #dcfce7 !important; color: #166534 !important; }
 .bg-danger { background: #fee2e2 !important; color: #991b1b !important; }
 .bg-incompleta { background: #ffedd5 !important; color: #9a3412 !important; }
+.bg-warning { background: #fef3c7 !important; color: #92400e !important; }
 
 /* Botones Grandes para el Trabajador */
 .button-group-vertical { 
@@ -533,6 +534,12 @@ textarea:focus {
     margin: 0 auto;
 }
 
+/* Expand warehouse view width */
+#view-warehouse {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
 /* Balance cards in worker view */
 .balance-item {
     background: #f8fafc;
@@ -586,22 +593,27 @@ textarea:focus {
         padding: 0.5rem; /* Más espacio útil en pantallas pequeñas */
     }
     #view-accounting,
-    #view-accounting .container {
+    #view-accounting .container,
+    #view-warehouse {
         max-width: 100%;
         padding: 0;
     }
-    #view-accounting .card {
+    #view-accounting .card,
+    #view-warehouse .card {
         padding: 1rem;
         border-radius: 0.9rem;
     }
-    #view-accounting table {
+    #view-accounting table,
+    #view-warehouse table {
         font-size: 0.75rem;
     }
-    #view-accounting th, #view-accounting td {
+    #view-accounting th, #view-accounting td,
+    #view-warehouse th, #view-warehouse td {
         padding: 0.5rem 0.35rem;
         font-size: 0.75rem;
     }
-    #view-accounting .log-header {
+    #view-accounting .log-header,
+    #view-warehouse .log-header {
         flex-direction: column;
         align-items: stretch;
         gap: 0.5rem;
@@ -609,7 +621,11 @@ textarea:focus {
     #view-accounting .log-header .form-inline,
     #view-accounting .log-header .form-group,
     #view-accounting .log-header select,
-    #view-accounting .log-header input {
+    #view-accounting .log-header input,
+    #view-warehouse .log-header .form-inline,
+    #view-warehouse .log-header .form-group,
+    #view-warehouse .log-header select,
+    #view-warehouse .log-header input {
         width: 100%;
     }
     .fruit-row {
@@ -633,14 +649,18 @@ textarea:focus {
     /* Botones de acción en tablas más grandes para dedo */
     #view-accounting .btn-whatsapp-sm,
     #view-accounting .btn-edit-sm,
-    #view-accounting .btn-danger-sm {
+    #view-accounting .btn-danger-sm,
+    #view-warehouse .btn-edit-sm,
+    #view-warehouse .btn-danger-sm {
         padding: 0.5rem 0.7rem;
         font-size: 0.85rem;
         margin: 0.1rem;
     }
     /* Input type=date más cómodo en iOS/Android */
     #view-accounting input[type="date"],
-    #view-accounting input[type="number"] {
+    #view-accounting input[type="number"],
+    #view-warehouse input[type="date"],
+    #view-warehouse input[type="number"] {
         font-size: 1rem; /* evita zoom automático en iOS */
         min-height: 2.75rem;
     }

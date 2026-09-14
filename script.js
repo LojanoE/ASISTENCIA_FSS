@@ -2,6 +2,7 @@
 const SESSION_KEY = 'attendance_session_v3';
 const DEVICE_WORKER_KEY = 'device_worker';
 const CONTADOR_PASSWORD = 'FINCASS';
+const BODEGUERO_PASSWORD = 'BODEGAFSS';
 const OLD_KEYS = ['attendance_records_v3', 'attendance_workers_v3', 'attendance_settings_v3', 'attendance_fruit_v3'];
 
 // --- HELPERS ---
@@ -42,12 +43,28 @@ function handleDbError(err) {
     console.error('DB Error:', err);
     alert('Error de conexión. Verifique su acceso a internet e intente de nuevo.');
 }
+
+// Reintenta una llamada a la base de datos ante fallas de red pasajeras
+// (común en conexiones rurales inestables) antes de darla por fallida.
+async function withRetry(fn, { retries = 2, delayMs = 1200 } = {}) {
+    let lastErr;
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            if (i < retries) await new Promise(r => setTimeout(r, delayMs));
+        }
+    }
+    throw lastErr;
+}
 const views = {
     login: document.getElementById('view-login'),
     worker: document.getElementById('view-worker'),
     admin: document.getElementById('view-admin'),
     fruit: document.getElementById('view-fruit'),
-    accounting: document.getElementById('view-accounting')
+    accounting: document.getElementById('view-accounting'),
+    warehouse: document.getElementById('view-warehouse')
 };
 
 // Login
@@ -160,6 +177,48 @@ const btnSaveTransactionEdit = document.getElementById('btnSaveTransactionEdit')
 const btnCancelTransactionEdit = document.getElementById('btnCancelTransactionEdit');
 let transactionToEditId = null;
 
+// Bodega — Herramientas y Equipos
+const toolLoanWorker = document.getElementById('toolLoanWorker');
+const toolLoanTool = document.getElementById('toolLoanTool');
+const toolLoanQty = document.getElementById('toolLoanQty');
+const toolLoanObs = document.getElementById('toolLoanObs');
+const btnAddToolLoan = document.getElementById('btnAddToolLoan');
+const toolTodaySummary = document.getElementById('toolTodaySummary');
+const toolTodayBody = document.getElementById('toolTodayBody');
+const toolPendingWorker = document.getElementById('toolPendingWorker');
+const toolPendingBody = document.getElementById('toolPendingBody');
+const toolName = document.getElementById('toolName');
+const toolCategory = document.getElementById('toolCategory');
+const toolTotalQty = document.getElementById('toolTotalQty');
+const btnAddTool = document.getElementById('btnAddTool');
+const toolInventoryBody = document.getElementById('toolInventoryBody');
+const toolLogFrom = document.getElementById('toolLogFrom');
+const toolLogTo = document.getElementById('toolLogTo');
+const toolLogWorker = document.getElementById('toolLogWorker');
+const toolLogFinca = document.getElementById('toolLogFinca');
+const toolLogResponsable = document.getElementById('toolLogResponsable');
+const toolLogBody = document.getElementById('toolLogBody');
+const btnExportToolLog = document.getElementById('btnExportToolLog');
+
+// Modal de retorno de herramienta
+const returnToolModal = document.getElementById('returnToolModal');
+const returnToolInfo = document.getElementById('returnToolInfo');
+const returnToolQty = document.getElementById('returnToolQty');
+const returnToolStatus = document.getElementById('returnToolStatus');
+const returnToolObs = document.getElementById('returnToolObs');
+const btnSaveToolReturn = document.getElementById('btnSaveToolReturn');
+const btnCancelToolReturn = document.getElementById('btnCancelToolReturn');
+let toolLoanToReturnId = null;
+
+// Modal de edición de herramienta
+const editToolModal = document.getElementById('editToolModal');
+const editToolName = document.getElementById('editToolName');
+const editToolCategory = document.getElementById('editToolCategory');
+const editToolTotalQty = document.getElementById('editToolTotalQty');
+const btnSaveToolEdit = document.getElementById('btnSaveToolEdit');
+const btnCancelToolEdit = document.getElementById('btnCancelToolEdit');
+let toolToEditId = null;
+
 // Calendar
 const calendarWorker = document.getElementById('calendarWorker');
 const calendarMonthLabel = document.getElementById('calendarMonthLabel');
@@ -179,9 +238,9 @@ function escapeHTML(str) {
     return p.innerHTML;
 }
 
-function downloadExcel(htmlTable, filename) {
+function downloadExcel(htmlTable, filename, extraHead = '') {
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Hoja1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Hoja1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->${extraHead}</head>
 <body>${htmlTable}</body></html>`;
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -258,6 +317,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             toggleFruitSubView(btn.dataset.tab);
         } else if (parent && parent.id === 'view-accounting') {
             toggleAccountingSubView(btn.dataset.tab);
+        } else if (parent && parent.id === 'view-warehouse') {
+            toggleWarehouseSubView(btn.dataset.tab);
         }
     });
 });
@@ -284,6 +345,28 @@ btnSaveTransactionEdit.addEventListener('click', withLoading(btnSaveTransactionE
 btnCancelTransactionEdit.addEventListener('click', () => {
     editTransactionModal.classList.add('hidden');
     transactionToEditId = null;
+});
+
+// Bodega event listeners
+document.getElementById('btnWarehouse').addEventListener('click', showWarehouseView);
+document.getElementById('btnBackToAdminFromWarehouse').addEventListener('click', () => { showView('admin'); renderAdminDashboard(); });
+document.getElementById('btnLogoutWarehouse').addEventListener('click', logout);
+btnAddToolLoan.addEventListener('click', withLoading(btnAddToolLoan, 'Registrando...', addToolLoan));
+toolPendingWorker.addEventListener('change', () => renderPendingLoans());
+btnAddTool.addEventListener('click', withLoading(btnAddTool, 'Agregando...', addTool));
+toolLogFrom.addEventListener('change', () => renderToolLog());
+toolLogTo.addEventListener('change', () => renderToolLog());
+toolLogWorker.addEventListener('change', () => renderToolLog());
+btnExportToolLog.addEventListener('click', withLoading(btnExportToolLog, 'Exportando...', exportToolLogExcel));
+btnSaveToolReturn.addEventListener('click', withLoading(btnSaveToolReturn, 'Guardando...', saveToolReturn));
+btnCancelToolReturn.addEventListener('click', () => {
+    returnToolModal.classList.add('hidden');
+    toolLoanToReturnId = null;
+});
+btnSaveToolEdit.addEventListener('click', withLoading(btnSaveToolEdit, 'Guardando...', saveToolEdit));
+btnCancelToolEdit.addEventListener('click', () => {
+    editToolModal.classList.add('hidden');
+    toolToEditId = null;
 });
 
 // Calendar event listeners
@@ -316,6 +399,9 @@ function togglePassVisibility() {
     } else if (loginUser.value === 'contador') {
         passContainer.classList.remove('hidden');
         loginPass.placeholder = 'Contraseña de contador';
+    } else if (loginUser.value === 'bodeguero') {
+        passContainer.classList.remove('hidden');
+        loginPass.placeholder = 'Contraseña de bodeguero';
     } else {
         passContainer.classList.add('hidden');
         loginPass.value = '';
@@ -349,6 +435,14 @@ async function handleLogin() {
         } else {
             alert('Contraseña incorrecta');
         }
+    } else if (user === 'bodeguero') {
+        if (loginPass.value === BODEGUERO_PASSWORD) {
+            currentUser = { name: 'Bodeguero', isAdmin: false, isWarehouse: true };
+            saveSession(currentUser);
+            showWarehouseView();
+        } else {
+            alert('Contraseña incorrecta');
+        }
     } else {
         currentUser = { name: user, isAdmin: false };
         saveSession(currentUser);
@@ -367,6 +461,8 @@ async function checkSession() {
             await renderAdminDashboard();
         } else if (session.isAccountant) {
             showAccountingView();
+        } else if (session.isWarehouse) {
+            showWarehouseView();
         } else {
             showView('worker');
             await renderWorkerDashboard();
@@ -389,7 +485,7 @@ function saveSession(user) {
 }
 
 function logout() {
-    if (currentUser && !currentUser.isAdmin && !currentUser.isAccountant) {
+    if (currentUser && !currentUser.isAdmin && !currentUser.isAccountant && !currentUser.isWarehouse) {
         const adminPass = prompt('Ingrese contraseña de administrador para cambiar de usuario:');
         if (adminPass === null) return;
         verifyAdminBeforeLogout(adminPass);
@@ -434,7 +530,7 @@ function showView(viewKey) {
 
 async function loadSettings() {
     try {
-        const settings = await SupabaseDB.getSettings();
+        const settings = await withRetry(() => SupabaseDB.getSettings());
         configEntryTime.value = settings.entryTime;
         configExitTime.value = settings.exitTime;
     } catch {
@@ -693,7 +789,7 @@ async function autoCloseMissingExits() {
         if (closedCount > 0) {
             console.log(`[Auto Exit] Total de salidas cerradas: ${closedCount}`);
             // Si estamos en la vista del worker, refrescar
-            if (currentUser && !currentUser.isAdmin) {
+            if (currentUser && !currentUser.isAdmin && !currentUser.isAccountant && !currentUser.isWarehouse) {
                 await renderWorkerDashboard();
             }
         }
@@ -817,7 +913,7 @@ async function addAdminRecord() {
 
 async function renderWorkerSelect() {
     try {
-        const workers = await SupabaseDB.getWorkers();
+        const workers = await withRetry(() => SupabaseDB.getWorkers());
         const deviceWorker = localStorage.getItem(DEVICE_WORKER_KEY);
 
         if (deviceWorker) {
@@ -825,6 +921,7 @@ async function renderWorkerSelect() {
                 <option value="">-- Seleccione --</option>
                 <option value="admin">Administrador</option>
                 <option value="contador">Contador</option>
+                <option value="bodeguero">Bodeguero</option>
                 <option value="${escapeHTML(deviceWorker)}">${escapeHTML(deviceWorker)}</option>
             `;
         } else {
@@ -832,6 +929,7 @@ async function renderWorkerSelect() {
                 <option value="">-- Seleccione su nombre --</option>
                 <option value="admin">Administrador</option>
                 <option value="contador">Contador</option>
+                <option value="bodeguero">Bodeguero</option>
                 ${workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('')}
             `;
         }
@@ -1953,6 +2051,456 @@ async function renderWorkerBalance() {
                 </tr>
             `).join('')
             : '<tr><td colspan="4" class="text-center">Sin movimientos en este rango</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- LÓGICA DE BODEGA (HERRAMIENTAS Y EQUIPOS) ---
+
+const TOOL_CATEGORY_LABELS = { herramienta: 'Herramienta', equipo: 'Equipo' };
+
+function showWarehouseView() {
+    showView('warehouse');
+    const isWarehouseOnly = currentUser && currentUser.isWarehouse;
+    document.getElementById('btnBackToAdminFromWarehouse').classList.toggle('hidden', isWarehouseOnly);
+    document.getElementById('btnLogoutWarehouse').classList.toggle('hidden', !isWarehouseOnly);
+    toggleWarehouseSubView('warehouse-out');
+}
+
+async function toggleWarehouseSubView(tabId) {
+    document.querySelectorAll('#view-warehouse .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    document.querySelectorAll('#view-warehouse .tab-content').forEach(tc => {
+        tc.classList.toggle('hidden', tc.id !== tabId);
+    });
+    if (tabId === 'warehouse-out') {
+        await renderToolLoanForm();
+        await renderTodayLoans();
+    } else if (tabId === 'warehouse-return') {
+        await renderPendingLoans();
+    } else if (tabId === 'warehouse-inventory') {
+        await renderToolInventory();
+    } else if (tabId === 'warehouse-log') {
+        await renderToolLog();
+    }
+}
+
+// Unidades en campo = préstamos sin retorno; disponible = total - en campo
+function computeToolStock(tools, pendingLoans) {
+    const inField = {};
+    pendingLoans.forEach(l => {
+        if (l.toolId) inField[l.toolId] = (inField[l.toolId] || 0) + l.quantity;
+    });
+    return tools.map(t => ({
+        ...t,
+        inField: inField[t.id] || 0,
+        available: t.totalQty - (inField[t.id] || 0)
+    }));
+}
+
+function workerOptionsHTML(workers, placeholder) {
+    return `<option value="">${placeholder}</option>` +
+        workers.map(w => `<option value="${escapeHTML(w.name)}">${escapeHTML(w.name)}</option>`).join('');
+}
+
+function loanStatusText(loan) {
+    if (!loan.timeIn) return 'En campo';
+    const missing = loan.quantity - loan.returnedQty;
+    return missing > 0 ? `${loan.returnStatus} (faltan ${missing})` : loan.returnStatus;
+}
+
+function loanStatusBadge(loan) {
+    let cls = 'bg-warning';
+    if (loan.timeIn) {
+        cls = loan.returnStatus === 'Bueno' ? 'bg-success' : loan.returnStatus === 'Dañado' ? 'bg-incompleta' : 'bg-danger';
+    }
+    return `<span class="badge ${cls}">${escapeHTML(loanStatusText(loan))}</span>`;
+}
+
+// --- Salida ---
+
+async function renderToolLoanForm() {
+    try {
+        const [workers, tools, pending] = await Promise.all([
+            SupabaseDB.getWorkers(),
+            SupabaseDB.getTools(),
+            SupabaseDB.getToolLoans({ pending: true })
+        ]);
+
+        const selectedWorker = toolLoanWorker.value;
+        toolLoanWorker.innerHTML = workerOptionsHTML(workers, '-- Seleccione --');
+        toolLoanWorker.value = selectedWorker;
+
+        const selectedTool = toolLoanTool.value;
+        toolLoanTool.innerHTML = tools.length
+            ? '<option value="">-- Seleccione --</option>' + computeToolStock(tools, pending).map(t =>
+                `<option value="${t.id}" ${t.available <= 0 ? 'disabled' : ''}>${escapeHTML(t.name)} — disp. ${t.available}</option>`
+            ).join('')
+            : '<option value="">Agregue herramientas en Inventario</option>';
+        toolLoanTool.value = selectedTool;
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function addToolLoan() {
+    const worker = toolLoanWorker.value;
+    const toolId = parseInt(toolLoanTool.value, 10);
+    const quantity = parseInt(toolLoanQty.value, 10);
+    const observation = toolLoanObs.value.trim();
+
+    if (!worker) return alert('Seleccione un trabajador');
+    if (!toolId) return alert('Seleccione una herramienta o equipo');
+    if (!quantity || quantity < 1) return alert('Ingrese una cantidad válida');
+
+    try {
+        const [tools, pending] = await Promise.all([
+            SupabaseDB.getTools(),
+            SupabaseDB.getToolLoans({ pending: true })
+        ]);
+        const tool = computeToolStock(tools, pending).find(t => t.id === toolId);
+        if (!tool) return alert('La herramienta ya no existe en el inventario');
+        if (quantity > tool.available) {
+            return alert(`Solo hay ${tool.available} disponible(s) de "${tool.name}" en bodega.`);
+        }
+
+        await SupabaseDB.addToolLoan({
+            toolId: tool.id,
+            toolName: tool.name,
+            category: tool.category,
+            worker,
+            quantity,
+            date: todayStr(),
+            timeOut: timeStr(),
+            observation,
+            createdBy: currentUser ? currentUser.name : 'Bodeguero'
+        });
+        // Se mantiene el trabajador para cargar varias herramientas seguidas
+        toolLoanTool.value = '';
+        toolLoanQty.value = '1';
+        toolLoanObs.value = '';
+        await renderToolLoanForm();
+        await renderTodayLoans();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function renderTodayLoans() {
+    try {
+        const today = todayStr();
+        const loans = await SupabaseDB.getToolLoans({ from: today, to: today });
+        const totalQty = loans.reduce((s, l) => s + l.quantity, 0);
+        const inFieldQty = loans.filter(l => !l.timeIn).reduce((s, l) => s + l.quantity, 0);
+
+        toolTodaySummary.innerHTML = `<span class="badge bg-info">Salidas: ${loans.length}</span> <span class="badge bg-success">Unidades: ${totalQty}</span> <span class="badge bg-warning">En campo: ${inFieldQty}</span>`;
+
+        toolTodayBody.innerHTML = loans.map(l => `
+            <tr>
+                <td><strong>${escapeHTML(l.worker)}</strong></td>
+                <td>${escapeHTML(l.toolName)}</td>
+                <td>${l.quantity}</td>
+                <td>${escapeHTML(l.timeOut)}</td>
+                <td>${loanStatusBadge(l)}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="5" class="text-center">Sin salidas hoy</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- Retorno ---
+
+async function renderPendingLoans() {
+    try {
+        const [workers, loans] = await Promise.all([
+            SupabaseDB.getWorkers(),
+            SupabaseDB.getToolLoans({ pending: true })
+        ]);
+
+        const selected = toolPendingWorker.value;
+        toolPendingWorker.innerHTML = workerOptionsHTML(workers, '-- Todos --');
+        toolPendingWorker.value = selected;
+
+        const today = todayStr();
+        const filtered = selected ? loans.filter(l => l.worker === selected) : loans;
+
+        toolPendingBody.innerHTML = filtered.map(l => `
+            <tr${l.date < today ? ' class="bg-danger"' : ''}>
+                <td>${displayDate(l.date)}</td>
+                <td><strong>${escapeHTML(l.worker)}</strong></td>
+                <td>${escapeHTML(l.toolName)}</td>
+                <td>${l.quantity}</td>
+                <td>${escapeHTML(l.timeOut)}</td>
+                <td><button class="btn btn-edit-sm" onclick="openReturnToolModal(${l.id})">Devolver</button></td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" class="text-center">No hay herramientas en campo</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.openReturnToolModal = async function(id) {
+    try {
+        const loans = await SupabaseDB.getToolLoans({ pending: true });
+        const loan = loans.find(l => l.id === id);
+        if (!loan) {
+            await renderPendingLoans();
+            return alert('Esta salida ya tiene retorno registrado');
+        }
+
+        toolLoanToReturnId = id;
+        returnToolInfo.textContent = `${loan.worker} — ${loan.toolName} x${loan.quantity} (salió ${displayDate(loan.date)} ${loan.timeOut})`;
+        returnToolQty.value = loan.quantity;
+        returnToolQty.max = loan.quantity;
+        returnToolStatus.value = 'Bueno';
+        returnToolObs.value = '';
+        returnToolModal.classList.remove('hidden');
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+async function saveToolReturn() {
+    const returnedQty = parseInt(returnToolQty.value, 10);
+    const returnStatus = returnToolStatus.value;
+    const returnObs = returnToolObs.value.trim();
+
+    try {
+        const loans = await SupabaseDB.getToolLoans({ pending: true });
+        const loan = loans.find(l => l.id === toolLoanToReturnId);
+        if (!loan) {
+            returnToolModal.classList.add('hidden');
+            toolLoanToReturnId = null;
+            await renderPendingLoans();
+            return alert('Esta salida ya tiene retorno registrado');
+        }
+
+        if (isNaN(returnedQty) || returnedQty < 0 || returnedQty > loan.quantity) {
+            return alert(`La cantidad devuelta debe estar entre 0 y ${loan.quantity}`);
+        }
+        const missing = loan.quantity - returnedQty;
+        if (missing > 0 && returnStatus === 'Bueno') {
+            return alert(`Faltan ${missing} unidad(es). Seleccione el estado Dañado o Perdido.`);
+        }
+
+        const observation = returnObs
+            ? `${loan.observation ? loan.observation + ' | ' : ''}Retorno: ${returnObs}`
+            : loan.observation;
+
+        await SupabaseDB.returnToolLoan(loan.id, { timeIn: timeStr(), returnedQty, returnStatus, observation });
+
+        if (missing > 0 && loan.toolId && confirm(`Faltan ${missing} de "${loan.toolName}".\n¿Descontar ${missing} unidad(es) faltante(s) del inventario?`)) {
+            const tools = await SupabaseDB.getTools();
+            const tool = tools.find(t => t.id === loan.toolId);
+            if (tool) await SupabaseDB.updateTool(tool.id, { totalQty: Math.max(0, tool.totalQty - missing) });
+        }
+
+        returnToolModal.classList.add('hidden');
+        toolLoanToReturnId = null;
+        await renderPendingLoans();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- Inventario ---
+
+async function renderToolInventory() {
+    try {
+        const [tools, pending] = await Promise.all([
+            SupabaseDB.getTools(),
+            SupabaseDB.getToolLoans({ pending: true })
+        ]);
+
+        toolInventoryBody.innerHTML = computeToolStock(tools, pending).map(t => `
+            <tr>
+                <td><strong>${escapeHTML(t.name)}</strong></td>
+                <td>${TOOL_CATEGORY_LABELS[t.category] || escapeHTML(t.category)}</td>
+                <td>${t.totalQty}</td>
+                <td>${t.inField}</td>
+                <td><span class="badge ${t.available > 0 ? 'bg-success' : 'bg-danger'}">${t.available}</span></td>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-edit-sm" onclick="openEditToolModal(${t.id})">Editar</button>
+                    <button class="btn btn-danger-sm" onclick="deleteTool(${t.id})">X</button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" class="text-center">Sin herramientas registradas</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function addTool() {
+    const name = toolName.value.trim();
+    const category = toolCategory.value;
+    const totalQty = parseInt(toolTotalQty.value, 10);
+
+    if (!name) return alert('Ingrese el nombre de la herramienta o equipo');
+    if (!totalQty || totalQty < 1) return alert('Ingrese una cantidad válida');
+
+    try {
+        const tools = await SupabaseDB.getTools();
+        if (tools.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+            return alert(`"${name}" ya existe en el inventario. Use Editar para cambiar la cantidad.`);
+        }
+        await SupabaseDB.addTool({ name, category, totalQty });
+        toolName.value = '';
+        toolTotalQty.value = '1';
+        await renderToolInventory();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.openEditToolModal = async function(id) {
+    try {
+        const tools = await SupabaseDB.getTools();
+        const tool = tools.find(t => t.id === id);
+        if (!tool) return;
+
+        toolToEditId = id;
+        editToolName.value = tool.name;
+        editToolCategory.value = tool.category;
+        editToolTotalQty.value = tool.totalQty;
+        editToolModal.classList.remove('hidden');
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+async function saveToolEdit() {
+    const name = editToolName.value.trim();
+    const category = editToolCategory.value;
+    const totalQty = parseInt(editToolTotalQty.value, 10);
+
+    if (!name) return alert('Ingrese el nombre');
+    if (isNaN(totalQty) || totalQty < 0) return alert('Ingrese una cantidad válida');
+
+    try {
+        const pending = await SupabaseDB.getToolLoans({ pending: true });
+        const inField = pending.filter(l => l.toolId === toolToEditId).reduce((s, l) => s + l.quantity, 0);
+        if (totalQty < inField) {
+            return alert(`Hay ${inField} unidad(es) en campo. El total no puede ser menor.`);
+        }
+
+        await SupabaseDB.updateTool(toolToEditId, { name, category, totalQty });
+        editToolModal.classList.add('hidden');
+        toolToEditId = null;
+        await renderToolInventory();
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+window.deleteTool = async function(id) {
+    try {
+        const pending = await SupabaseDB.getToolLoans({ pending: true });
+        if (pending.some(l => l.toolId === id)) {
+            return alert('No se puede eliminar: tiene unidades en campo. Registre primero el retorno.');
+        }
+        if (!confirm('¿Eliminar esta herramienta del inventario? El historial de salidas se conserva.')) return;
+        await SupabaseDB.deleteTool(id);
+        await renderToolInventory();
+    } catch (err) {
+        handleDbError(err);
+    }
+};
+
+// --- Registro R019 ---
+
+async function renderToolLog() {
+    const today = todayStr();
+    if (!toolLogFrom.value) toolLogFrom.value = `${today.slice(0, 7)}-01`;
+    if (!toolLogTo.value) toolLogTo.value = today;
+
+    try {
+        const [workers, loans] = await Promise.all([
+            SupabaseDB.getWorkers(),
+            SupabaseDB.getToolLoans({ from: toolLogFrom.value, to: toolLogTo.value, worker: toolLogWorker.value })
+        ]);
+
+        const selected = toolLogWorker.value;
+        toolLogWorker.innerHTML = workerOptionsHTML(workers, '-- Todos --');
+        toolLogWorker.value = selected;
+
+        toolLogBody.innerHTML = loans.map(l => `
+            <tr>
+                <td>${displayDate(l.date)}</td>
+                <td><strong>${escapeHTML(l.worker)}</strong></td>
+                <td>${escapeHTML(l.toolName)}</td>
+                <td>${TOOL_CATEGORY_LABELS[l.category] || escapeHTML(l.category)}</td>
+                <td>${l.quantity}</td>
+                <td>${escapeHTML(l.timeOut)}</td>
+                <td>${escapeHTML(l.timeIn || '-')}</td>
+                <td>${l.timeIn ? l.returnedQty : '-'}</td>
+                <td>${loanStatusBadge(l)}</td>
+                <td><small>${escapeHTML(l.observation || '-')}</small></td>
+            </tr>
+        `).join('') || '<tr><td colspan="10" class="text-center">Sin registros en este rango</td></tr>';
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function exportToolLogExcel() {
+    const from = toolLogFrom.value;
+    const to = toolLogTo.value;
+    const worker = toolLogWorker.value;
+    if (!from || !to) return alert('Seleccione el rango de fechas');
+
+    try {
+        const loans = await SupabaseDB.getToolLoans({ from, to, worker });
+        if (loans.length === 0) return alert('No hay registros para exportar en este rango');
+        loans.sort((a, b) => a.id - b.id);
+
+        // Formato BPA (igual a Registros.docx): título, encabezado Finca/Responsable/Fecha, tabla, observaciones y firma
+        const cols = 11;
+        const blank = '______________________';
+        const finca = escapeHTML(toolLogFinca.value.trim()) || blank;
+        const responsable = escapeHTML(toolLogResponsable.value.trim()) || blank;
+        const fecha = from === to ? displayDate(from) : `${displayDate(from)} al ${displayDate(to)}`;
+        const hdrStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;font-weight:bold;"';
+        const cellStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;height:24pt;"';
+        const headers = ['Fecha', 'Hora salida', 'Trabajador', 'Herramienta / Equipo', 'Tipo', 'Cantidad', 'Hora retorno', 'Cant. devuelta', 'Estado', 'Observaciones', 'Firma'];
+
+        let html = '<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;">';
+        html += `<tr><td colspan="${cols}" style="text-align:center;font-size:16pt;font-weight:bold;">REGISTROS BPA - PRODUCCIÓN DE PITAHAYA AMARILLA</td></tr>`;
+        html += `<tr><td colspan="${cols}" style="text-align:center;">Versión: 01 &nbsp;·&nbsp; Código: BPA-REG</td></tr>`;
+        html += `<tr><td colspan="${cols}"></td></tr>`;
+        html += `<tr><td colspan="${cols}" style="text-align:center;font-size:13pt;font-weight:bold;">R019 - SALIDA Y RETORNO DE HERRAMIENTAS Y EQUIPOS</td></tr>`;
+        html += `<tr><td colspan="${cols}"></td></tr>`;
+        html += `<tr><td colspan="${cols}" style="font-weight:bold;">Finca: ${finca} &nbsp;&nbsp;&nbsp; Responsable: ${responsable} &nbsp;&nbsp;&nbsp; Fecha: ${fecha}</td></tr>`;
+        html += `<tr>${headers.map(h => `<td ${hdrStyle}>${h}</td>`).join('')}</tr>`;
+
+        loans.forEach(l => {
+            const values = [
+                displayDate(l.date),
+                escapeHTML(l.timeOut),
+                escapeHTML(l.worker),
+                escapeHTML(l.toolName),
+                TOOL_CATEGORY_LABELS[l.category] || escapeHTML(l.category),
+                l.quantity,
+                escapeHTML(l.timeIn),
+                l.timeIn ? l.returnedQty : '',
+                escapeHTML(loanStatusText(l)),
+                escapeHTML(l.observation),
+                ''
+            ];
+            html += `<tr>${values.map(v => `<td ${cellStyle}>${v}</td>`).join('')}</tr>`;
+        });
+
+        html += `<tr><td colspan="${cols}"></td></tr>`;
+        html += `<tr><td colspan="${cols}">Observaciones: _________________________________________________</td></tr>`;
+        html += `<tr><td colspan="${cols}"></td></tr>`;
+        html += `<tr><td colspan="${cols}">Firma responsable: ______________________________</td></tr>`;
+        html += '</table>';
+
+        const workerSuffix = worker ? `_${worker.replace(/\s+/g, '_')}` : '';
+        downloadExcel(html, `R019_herramientas${workerSuffix}_${from}_al_${to}.xls`,
+            '<style>@page { mso-page-orientation: landscape; margin: 0.75in 0.5in; }</style>');
     } catch (err) {
         handleDbError(err);
     }
