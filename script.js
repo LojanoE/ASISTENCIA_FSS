@@ -43,6 +43,21 @@ function handleDbError(err) {
     console.error('DB Error:', err);
     alert('Error de conexión. Verifique su acceso a internet e intente de nuevo.');
 }
+
+// Reintenta una llamada a la base de datos ante fallas de red pasajeras
+// (común en conexiones rurales inestables) antes de darla por fallida.
+async function withRetry(fn, { retries = 2, delayMs = 1200 } = {}) {
+    let lastErr;
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            if (i < retries) await new Promise(r => setTimeout(r, delayMs));
+        }
+    }
+    throw lastErr;
+}
 const views = {
     login: document.getElementById('view-login'),
     worker: document.getElementById('view-worker'),
@@ -515,7 +530,7 @@ function showView(viewKey) {
 
 async function loadSettings() {
     try {
-        const settings = await SupabaseDB.getSettings();
+        const settings = await withRetry(() => SupabaseDB.getSettings());
         configEntryTime.value = settings.entryTime;
         configExitTime.value = settings.exitTime;
     } catch {
@@ -898,7 +913,7 @@ async function addAdminRecord() {
 
 async function renderWorkerSelect() {
     try {
-        const workers = await SupabaseDB.getWorkers();
+        const workers = await withRetry(() => SupabaseDB.getWorkers());
         const deviceWorker = localStorage.getItem(DEVICE_WORKER_KEY);
 
         if (deviceWorker) {
