@@ -4,8 +4,9 @@
 --
 -- Este archivo es para INSTALACIÓN NUEVA (idempotente).
 -- Si tu base YA existe y solo quieres agregar el módulo
--- de contabilidad, ejecuta en su lugar:
+-- de contabilidad o de bodega, ejecuta en su lugar:
 --   supabase-migration-contabilidad.sql
+--   supabase-migration-bodega.sql
 -- ============================================
 
 -- 1. Trabajadores
@@ -85,6 +86,34 @@ create table if not exists payroll_entries (
   created_at timestamptz default now()
 );
 
+-- 8. Inventario de herramientas y equipos (bodega)
+create table if not exists tools (
+  id bigint generated always as identity primary key,
+  name text not null,
+  category text not null default 'herramienta',   -- 'herramienta' | 'equipo'
+  total_qty integer not null default 0,
+  observation text default '',
+  created_at timestamptz default now()
+);
+
+-- 9. Salidas a la finca y retornos de herramientas (registro R019)
+create table if not exists tool_loans (
+  id bigint generated always as identity primary key,
+  tool_id bigint references tools(id) on delete set null,
+  tool_name text not null,
+  category text default 'herramienta',
+  worker text not null,
+  quantity integer not null,
+  date text not null,
+  time_out text not null,
+  time_in text default '',                         -- '' = todavía en campo
+  returned_qty integer default 0,
+  return_status text default '',                   -- 'Bueno' | 'Dañado' | 'Perdido'
+  observation text default '',
+  created_by text default '',
+  created_at timestamptz default now()
+);
+
 -- Fila inicial de configuración (solo si settings está vacía — no duplica datos)
 insert into settings (entry_time, exit_time, admin_password)
 select '08:00', '17:00', '123'
@@ -101,6 +130,8 @@ alter table fruit enable row level security;
 alter table worker_transactions enable row level security;
 alter table payroll_periods enable row level security;
 alter table payroll_entries enable row level security;
+alter table tools enable row level security;
+alter table tool_loans enable row level security;
 
 -- Las policies se borran y recrean para que el script sea re-ejecutable
 drop policy if exists "Allow all on workers" on workers;
@@ -110,6 +141,8 @@ drop policy if exists "Allow all on fruit" on fruit;
 drop policy if exists "Allow all on worker_transactions" on worker_transactions;
 drop policy if exists "Allow all on payroll_periods" on payroll_periods;
 drop policy if exists "Allow all on payroll_entries" on payroll_entries;
+drop policy if exists "Allow all on tools" on tools;
+drop policy if exists "Allow all on tool_loans" on tool_loans;
 
 create policy "Allow all on workers" on workers for all using (true) with check (true);
 create policy "Allow all on attendance_records" on attendance_records for all using (true) with check (true);
@@ -118,6 +151,8 @@ create policy "Allow all on fruit" on fruit for all using (true) with check (tru
 create policy "Allow all on worker_transactions" on worker_transactions for all using (true) with check (true);
 create policy "Allow all on payroll_periods" on payroll_periods for all using (true) with check (true);
 create policy "Allow all on payroll_entries" on payroll_entries for all using (true) with check (true);
+create policy "Allow all on tools" on tools for all using (true) with check (true);
+create policy "Allow all on tool_loans" on tool_loans for all using (true) with check (true);
 
 -- ============================================
 -- Si ya creaste las tablas sin admin_password,

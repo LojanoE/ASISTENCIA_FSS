@@ -284,5 +284,94 @@ const SupabaseDB = {
             if (error) throw error;
             return data.id;
         }
+    },
+
+    // --- Bodega: Herramientas y Equipos ---
+    async getTools() {
+        const { data, error } = await _supabase.from('tools').select('*').order('name');
+        if (error) throw error;
+        return data.map(t => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+            totalQty: t.total_qty,
+            observation: t.observation || ''
+        }));
+    },
+    async addTool(tool) {
+        const row = {
+            name: tool.name,
+            category: tool.category,
+            total_qty: tool.totalQty,
+            observation: tool.observation || ''
+        };
+        const { data, error } = await _supabase.from('tools').insert(row).select().single();
+        if (error) throw error;
+        return data.id;
+    },
+    async updateTool(id, updates) {
+        const row = {};
+        if (updates.name !== undefined) row.name = updates.name;
+        if (updates.category !== undefined) row.category = updates.category;
+        if (updates.totalQty !== undefined) row.total_qty = updates.totalQty;
+        if (updates.observation !== undefined) row.observation = updates.observation;
+        const { error } = await _supabase.from('tools').update(row).eq('id', id);
+        if (error) throw error;
+    },
+    async deleteTool(id) {
+        const { error } = await _supabase.from('tools').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    // --- Bodega: Salidas y retornos ---
+    async getToolLoans(filters = {}) {
+        let query = _supabase.from('tool_loans').select('*').order('id', { ascending: false });
+        if (filters.worker) query = query.eq('worker', filters.worker);
+        if (filters.from) query = query.gte('date', filters.from);
+        if (filters.to) query = query.lte('date', filters.to);
+        if (filters.pending) query = query.eq('time_in', '');
+        const { data, error } = await query;
+        if (error) throw error;
+        return data.map(r => ({
+            id: r.id,
+            toolId: r.tool_id,
+            toolName: r.tool_name,
+            category: r.category || '',
+            worker: r.worker,
+            quantity: r.quantity,
+            date: r.date,
+            timeOut: r.time_out,
+            timeIn: r.time_in || '',
+            returnedQty: r.returned_qty || 0,
+            returnStatus: r.return_status || '',
+            observation: r.observation || '',
+            createdBy: r.created_by || ''
+        }));
+    },
+    async addToolLoan(loan) {
+        const row = {
+            tool_id: loan.toolId,
+            tool_name: loan.toolName,
+            category: loan.category,
+            worker: loan.worker,
+            quantity: loan.quantity,
+            date: loan.date,
+            time_out: loan.timeOut,
+            observation: loan.observation || '',
+            created_by: loan.createdBy || ''
+        };
+        const { data, error } = await _supabase.from('tool_loans').insert(row).select().single();
+        if (error) throw error;
+        return data.id;
+    },
+    async returnToolLoan(id, ret) {
+        const row = {
+            time_in: ret.timeIn,
+            returned_qty: ret.returnedQty,
+            return_status: ret.returnStatus
+        };
+        if (ret.observation !== undefined) row.observation = ret.observation;
+        const { error } = await _supabase.from('tool_loans').update(row).eq('id', id);
+        if (error) throw error;
     }
 };
