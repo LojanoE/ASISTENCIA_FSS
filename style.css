@@ -665,3 +665,139 @@ textarea:focus {
         min-height: 2.75rem;
     }
 }
+
+/* Imprimir y registros (admin) */
+.report-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    text-align: left;
+}
+
+@media (min-width: 768px) {
+    .report-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+.report-block {
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.report-block h3 { font-size: 1rem; }
+.report-block .form-group { margin-bottom: 0; }
+
+.report-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.report-checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.report-checks label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.report-checks input {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.report-all-dates {
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+    grid-column: 1 / -1;
+}
+
+.report-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+
+.report-workers {
+    text-align: left;
+    margin-bottom: 1rem;
+}
+
+.report-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.report-picker-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.report-worker-list {
+    max-height: 14rem;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+
+/* Área de impresión: oculta en pantalla, es lo único visible al imprimir */
+#printArea { display: none; }
+
+@media print {
+    @page { size: landscape; margin: 10mm; }
+
+    body {
+        background: white;
+        padding: 0;
+        display: block;
+        min-height: 0;
+    }
+    body > *:not(#printArea) { display: none !important; }
+
+    #printArea {
+        display: block;
+        color: #000;
+        font-family: Calibri, Arial, sans-serif;
+    }
+    #printArea table { width: 100%; background: white; }
+    #printArea thead { display: table-header-group; } /* repite encabezados en cada hoja */
+    #printArea tr { page-break-inside: avoid; }
+    #printArea th,
+    #printArea td {
+        border-bottom: none;
+        padding: 3pt 4pt;
+        font-size: 9pt;
+        color: #000;
+        background: none;
+        text-transform: none;
+        letter-spacing: normal;
+    }
+
+    .print-header { margin-bottom: 8pt; }
+    .print-header h1 { font-size: 16pt; }
+    .print-header p { font-size: 9pt; }
+
+    .print-section { margin-top: 12pt; }
+    .print-section h2 { font-size: 12pt; margin: 0 0 4pt; }
+
+    .print-table th,
+    .print-table td {
+        border: 1px solid #000 !important;
+        text-align: left;
+    }
+    .print-table th { font-weight: bold; }
+    .print-table .print-total td { font-weight: bold; }
+
+    .print-register td { text-align: left; }
+}

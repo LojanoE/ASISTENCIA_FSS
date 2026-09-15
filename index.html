@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistencia FSS - Control de Horarios</title>
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
     <div class="container">
@@ -111,6 +111,7 @@
                         <button id="btnAccounting" class="btn btn-outline-sm">💰 Contabilidad</button>
                         <button id="btnFruit" class="btn btn-outline-sm">🧺 Envío de Fruta</button>
                         <button id="btnWarehouse" class="btn btn-outline-sm">🧰 Bodega</button>
+                        <button id="btnReports" class="btn btn-outline-sm">🖨️ Imprimir</button>
                         <button id="btnLogoutAdmin" class="btn btn-outline-sm">Cerrar Sesión</button>
                     </div>
                 </div>
@@ -207,6 +208,79 @@
                         <div class="calendar-header">Vi</div>
                         <div class="calendar-header">Sá</div>
                         <div class="calendar-header">Do</div>
+                    </div>
+                </section>
+
+                <!-- Imprimir base de datos y registros oficiales -->
+                <section id="reportsCard" class="card full-width">
+                    <h2>🖨️ Imprimir y Registros</h2>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="reportFrom">Desde</label>
+                            <input type="date" id="reportFrom">
+                        </div>
+                        <div class="form-group">
+                            <label for="reportTo">Hasta</label>
+                            <input type="date" id="reportTo">
+                        </div>
+                    </div>
+                    <div class="fruit-row">
+                        <div class="form-group">
+                            <label for="reportFinca">Finca (encabezado)</label>
+                            <input type="text" id="reportFinca" placeholder="Nombre de la finca">
+                        </div>
+                        <div class="form-group">
+                            <label for="reportResponsable">Responsable (encabezado)</label>
+                            <input type="text" id="reportResponsable" placeholder="Nombre del responsable">
+                        </div>
+                    </div>
+                    <div class="report-block report-workers">
+                        <h3>Trabajadores</h3>
+                        <div class="report-checks">
+                            <label><input type="radio" name="reportWorkerMode" value="todos" checked> Todos los trabajadores</label>
+                            <label><input type="radio" name="reportWorkerMode" value="seleccion"> Solo algunos</label>
+                        </div>
+                        <div id="reportWorkerPicker" class="report-picker hidden">
+                            <div class="report-picker-actions">
+                                <button type="button" id="btnReportWorkersAll" class="btn btn-outline-sm">Marcar todos</button>
+                                <button type="button" id="btnReportWorkersNone" class="btn btn-outline-sm">Desmarcar todos</button>
+                            </div>
+                            <div id="reportWorkerList" class="report-checks report-worker-list"></div>
+                        </div>
+                        <p class="report-hint">Aplica a Asistencia, Contabilidad, Herramientas y a los registros de asistencia y R019. El envío de fruta (R014) no depende del trabajador.</p>
+                    </div>
+                    <div class="report-grid">
+                        <div class="report-block">
+                            <h3>Base de datos</h3>
+                            <p class="report-hint">Imprime las tablas marcadas en el rango de fechas.</p>
+                            <div class="report-checks">
+                                <label><input type="checkbox" class="report-table-check" value="trabajadores" checked> Trabajadores</label>
+                                <label><input type="checkbox" class="report-table-check" value="asistencia" checked> Asistencia</label>
+                                <label><input type="checkbox" class="report-table-check" value="fruta" checked> Envío de fruta</label>
+                                <label><input type="checkbox" class="report-table-check" value="movimientos"> Contabilidad</label>
+                                <label><input type="checkbox" class="report-table-check" value="herramientas"> Herramientas</label>
+                                <label class="report-all-dates"><input type="checkbox" id="reportAllDates"> Todo el historial (ignorar fechas)</label>
+                            </div>
+                            <div class="report-actions">
+                                <button id="btnPrintDatabase" class="btn btn-primary">🖨️ Imprimir base de datos</button>
+                            </div>
+                        </div>
+                        <div class="report-block">
+                            <h3>Registro para el Ministerio</h3>
+                            <p class="report-hint">Formato oficial con encabezado, observaciones y firmas. En la ventana de impresión elija «Guardar como PDF» para enviarlo en digital.</p>
+                            <div class="form-group">
+                                <label for="reportRegister">Registro</label>
+                                <select id="reportRegister">
+                                    <option value="asistencia">Asistencia del personal (entrada y salida)</option>
+                                    <option value="r014">R014 – Despacho (envío de fruta)</option>
+                                    <option value="r019">R019 – Salida y retorno de herramientas</option>
+                                </select>
+                            </div>
+                            <div class="report-actions">
+                                <button id="btnPrintRegister" class="btn btn-primary">🖨️ Imprimir</button>
+                                <button id="btnExportRegister" class="btn btn-secondary">📊 Excel</button>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -748,6 +822,9 @@
         </section>
     </div>
 
+    <!-- CONTENIDO A IMPRIMIR (solo visible en la hoja impresa) -->
+    <div id="printArea"></div>
+
     <!-- MODAL DE EDICIÓN (ADMIN) -->
     <div id="editModal" class="modal hidden">
         <div class="modal-content card">
@@ -899,6 +976,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabaseClient.js?v=7"></script>
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>
