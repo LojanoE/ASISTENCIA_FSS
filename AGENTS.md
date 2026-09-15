@@ -52,6 +52,17 @@ Vanilla HTML/CSS/JS SPA for attendance tracking (GPS optional) and fruit shipmen
 - Return: `returned_qty` (0..quantity) + `return_status` (`Bueno` / `Dañado` / `Perdido`; `Bueno` not allowed when units are missing). If units are missing, a `confirm()` offers to subtract them from `tools.total_qty`
 - Export `exportToolLogExcel()`: .xls in the BPA format of `Registros.docx` — title "REGISTROS BPA - PRODUCCIÓN DE PITAHAYA AMARILLA", "Versión 01 · Código BPA-REG", section **R019 - SALIDA Y RETORNO DE HERRAMIENTAS Y EQUIPOS**, Finca/Responsable/Fecha header (from inputs, blank lines if empty), black-bordered table with an empty **Firma** column, footer "Observaciones" and "Firma responsable". Landscape via `downloadExcel(html, filename, extraHead)`
 
+### Print & Registers (Imprimir y Registros — admin)
+- Card `#reportsCard` at the end of the admin panel; header button "🖨️ Imprimir" scrolls to it. Shared inputs: `reportFrom` / `reportTo` (default: current month), `reportFinca` / `reportResponsable` (document header)
+- Printing goes through `printDocument(fileTitle, html)`: fills `#printArea` (hidden on screen) and calls `window.print()`. `@media print` in `style.css` hides everything else, prints landscape and repeats `<thead>` on every page. `document.title` is swapped temporarily so "Guardar como PDF" suggests a file name
+- Worker filter: radios `reportWorkerMode` (`todos` / `seleccion`) + checkbox list `#reportWorkerList`, filled by `renderReportWorkers()` from `renderWorkerList()` (keeps checked names). `selectedReportWorkers()` returns `null` for all, otherwise a `Set` of names. Applies to trabajadores, asistencia, movimientos and tool loans in the database print, and to the `asistencia` / `r019` registers (file name gets `workersFileSuffix()`); fruit and tool inventory ignore it
+- **Base de datos** `printDatabase()`: checkboxes `.report-table-check` (`trabajadores`, `asistencia`, `fruta`, `movimientos`, `herramientas`); `#reportAllDates` ignores the date range
+- **Registro para el Ministerio** `buildRegister()` → `printRegister()` / `exportRegisterExcel()`, builders in `REGISTER_BUILDERS`:
+  - `asistencia`: one row per worker per day — entrada, salida, horas trabajadas, novedad (atraso / extras / faltante), observaciones (without 'Sin GPS') and an empty "Firma trabajador" column
+  - `r014`: R014 Despacho from `fruit` — Proveedor as lote, Nacional/Exportación as destino, Cliente and Responsable left blank to fill by hand
+  - `r019`: same rows as the Bodega export (`toolLogRegisterRows()`)
+- `registerTableHTML({ heading, subheading, name, finca, responsable, fecha, headers, rows })` builds the `Registros.docx` layout for every register, both for Excel and for print. `rows` must already be escaped
+
 ### Attendance Status System
 - **Entrada** (compared against `settings.entry_time`):
   - `Puntual`: llegó a hora o antes

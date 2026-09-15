@@ -200,6 +200,20 @@ const toolLogResponsable = document.getElementById('toolLogResponsable');
 const toolLogBody = document.getElementById('toolLogBody');
 const btnExportToolLog = document.getElementById('btnExportToolLog');
 
+// Admin — Imprimir y registros
+const reportFrom = document.getElementById('reportFrom');
+const reportTo = document.getElementById('reportTo');
+const reportFinca = document.getElementById('reportFinca');
+const reportResponsable = document.getElementById('reportResponsable');
+const reportAllDates = document.getElementById('reportAllDates');
+const reportRegister = document.getElementById('reportRegister');
+const reportWorkerPicker = document.getElementById('reportWorkerPicker');
+const reportWorkerList = document.getElementById('reportWorkerList');
+const btnPrintDatabase = document.getElementById('btnPrintDatabase');
+const btnPrintRegister = document.getElementById('btnPrintRegister');
+const btnExportRegister = document.getElementById('btnExportRegister');
+const printArea = document.getElementById('printArea');
+
 // Modal de retorno de herramienta
 const returnToolModal = document.getElementById('returnToolModal');
 const returnToolInfo = document.getElementById('returnToolInfo');
@@ -249,6 +263,66 @@ function downloadExcel(htmlTable, filename, extraHead = '') {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+}
+
+const BPA_HEADING = 'REGISTROS BPA - PRODUCCIÓN DE PITAHAYA AMARILLA';
+const BPA_SUBHEADING = 'Versión: 01 &nbsp;·&nbsp; Código: BPA-REG';
+const REGISTER_EXCEL_HEAD = '<style>@page { mso-page-orientation: landscape; margin: 0.75in 0.5in; }</style>';
+
+function rangeLabel(from, to) {
+    return from === to ? displayDate(from) : `${displayDate(from)} al ${displayDate(to)}`;
+}
+
+// Formato de Registros.docx: título, encabezado Finca/Responsable/Fecha, tabla con bordes,
+// observaciones y firma. Sirve igual para Excel y para imprimir. `rows` debe venir escapado.
+function registerTableHTML({ heading = BPA_HEADING, subheading = BPA_SUBHEADING, name, finca, responsable, fecha, headers, rows }) {
+    const cols = headers.length;
+    const blank = '______________________';
+    const hdrStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;font-weight:bold;"';
+    const cellStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;height:24pt;"';
+    const fullRow = (content = '', style = '') => `<tr><td colspan="${cols}"${style ? ` style="${style}"` : ''}>${content}</td></tr>`;
+
+    // El encabezado va en <thead> para que se repita en cada hoja impresa
+    let html = '<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;"><thead>';
+    html += fullRow(heading, 'text-align:center;font-size:16pt;font-weight:bold;');
+    html += fullRow(subheading, 'text-align:center;');
+    html += fullRow();
+    html += fullRow(name, 'text-align:center;font-size:13pt;font-weight:bold;');
+    html += fullRow();
+    html += fullRow(`Finca: ${escapeHTML(finca) || blank} &nbsp;&nbsp;&nbsp; Responsable: ${escapeHTML(responsable) || blank} &nbsp;&nbsp;&nbsp; Fecha: ${fecha}`, 'font-weight:bold;');
+    html += `<tr>${headers.map(h => `<td ${hdrStyle}>${h}</td>`).join('')}</tr></thead><tbody>`;
+    rows.forEach(values => {
+        html += `<tr>${values.map(v => `<td ${cellStyle}>${v}</td>`).join('')}</tr>`;
+    });
+    html += fullRow();
+    html += fullRow('Observaciones: _________________________________________________');
+    html += fullRow();
+    html += fullRow('Firma responsable: ______________________________');
+    html += '</tbody></table>';
+    return html;
+}
+
+// Muestra `html` solo en la hoja impresa. El título se usa como nombre al "Guardar como PDF".
+function printDocument(fileTitle, html) {
+    printArea.innerHTML = html;
+    const previousTitle = document.title;
+    document.title = fileTitle;
+    window.addEventListener('afterprint', () => { document.title = previousTitle; }, { once: true });
+    window.print();
+}
+
+// Acepta "08:05", "8:05 a. m." o "4:30 p. m." y devuelve minutos desde medianoche
+function timeToMinutes(time) {
+    const match = String(time || '').match(/(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    let hours = parseInt(match[1], 10);
+    if (/p\.?\s*m/i.test(time) && hours < 12) hours += 12;
+    if (/a\.?\s*m/i.test(time) && hours === 12) hours = 0;
+    return hours * 60 + parseInt(match[2], 10);
+}
+
+function formatMinutes(mins) {
+    return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`;
 }
 
 // --- INICIALIZACIÓN ---
@@ -382,6 +456,21 @@ document.getElementById('btnNextMonth').addEventListener('click', () => {
 });
 calendarWorker.addEventListener('change', () => renderCalendar());
 
+// Imprimir y registros event listeners
+document.getElementById('btnReports').addEventListener('click', () => {
+    document.getElementById('reportsCard').scrollIntoView({ behavior: 'smooth' });
+});
+document.querySelectorAll('input[name="reportWorkerMode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        reportWorkerPicker.classList.toggle('hidden', selectedReportWorkers() === null);
+    });
+});
+document.getElementById('btnReportWorkersAll').addEventListener('click', () => setReportWorkersChecked(true));
+document.getElementById('btnReportWorkersNone').addEventListener('click', () => setReportWorkersChecked(false));
+btnPrintDatabase.addEventListener('click', withLoading(btnPrintDatabase, 'Preparando...', printDatabase));
+btnPrintRegister.addEventListener('click', withLoading(btnPrintRegister, 'Preparando...', printRegister));
+btnExportRegister.addEventListener('click', withLoading(btnExportRegister, 'Exportando...', exportRegisterExcel));
+
 // --- LÓGICA DE LOGIN & SESIÓN ---
 
 function initDateFilters() {
@@ -389,6 +478,8 @@ function initDateFilters() {
     filterDateFrom.value = today;
     filterDateTo.value = today;
     accDate.value = today;
+    reportFrom.value = `${todayStr().slice(0, 7)}-01`;
+    reportTo.value = todayStr();
     initPayrollPeriodDefaults();
 }
 
@@ -1018,6 +1109,7 @@ async function addWorker() {
 async function renderWorkerList() {
     try {
         const workers = await SupabaseDB.getWorkers();
+        renderReportWorkers(workers);
         workerList.innerHTML = workers.map(w => `
             <li>
                 <span>${escapeHTML(w.name)}</span>
@@ -2445,6 +2537,25 @@ async function renderToolLog() {
     }
 }
 
+const R019_NAME = 'R019 - SALIDA Y RETORNO DE HERRAMIENTAS Y EQUIPOS';
+const R019_HEADERS = ['Fecha', 'Hora salida', 'Trabajador', 'Herramienta / Equipo', 'Tipo', 'Cantidad', 'Hora retorno', 'Cant. devuelta', 'Estado', 'Observaciones', 'Firma'];
+
+function toolLogRegisterRows(loans) {
+    return [...loans].sort((a, b) => a.id - b.id).map(l => [
+        displayDate(l.date),
+        escapeHTML(l.timeOut),
+        escapeHTML(l.worker),
+        escapeHTML(l.toolName),
+        TOOL_CATEGORY_LABELS[l.category] || escapeHTML(l.category),
+        l.quantity,
+        escapeHTML(l.timeIn),
+        l.timeIn ? l.returnedQty : '',
+        escapeHTML(loanStatusText(l)),
+        escapeHTML(l.observation),
+        ''
+    ]);
+}
+
 async function exportToolLogExcel() {
     const from = toolLogFrom.value;
     const to = toolLogTo.value;
@@ -2454,53 +2565,317 @@ async function exportToolLogExcel() {
     try {
         const loans = await SupabaseDB.getToolLoans({ from, to, worker });
         if (loans.length === 0) return alert('No hay registros para exportar en este rango');
-        loans.sort((a, b) => a.id - b.id);
 
-        // Formato BPA (igual a Registros.docx): título, encabezado Finca/Responsable/Fecha, tabla, observaciones y firma
-        const cols = 11;
-        const blank = '______________________';
-        const finca = escapeHTML(toolLogFinca.value.trim()) || blank;
-        const responsable = escapeHTML(toolLogResponsable.value.trim()) || blank;
-        const fecha = from === to ? displayDate(from) : `${displayDate(from)} al ${displayDate(to)}`;
-        const hdrStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;font-weight:bold;"';
-        const cellStyle = 'style="border:1px solid #000;text-align:center;vertical-align:middle;height:24pt;"';
-        const headers = ['Fecha', 'Hora salida', 'Trabajador', 'Herramienta / Equipo', 'Tipo', 'Cantidad', 'Hora retorno', 'Cant. devuelta', 'Estado', 'Observaciones', 'Firma'];
-
-        let html = '<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;">';
-        html += `<tr><td colspan="${cols}" style="text-align:center;font-size:16pt;font-weight:bold;">REGISTROS BPA - PRODUCCIÓN DE PITAHAYA AMARILLA</td></tr>`;
-        html += `<tr><td colspan="${cols}" style="text-align:center;">Versión: 01 &nbsp;·&nbsp; Código: BPA-REG</td></tr>`;
-        html += `<tr><td colspan="${cols}"></td></tr>`;
-        html += `<tr><td colspan="${cols}" style="text-align:center;font-size:13pt;font-weight:bold;">R019 - SALIDA Y RETORNO DE HERRAMIENTAS Y EQUIPOS</td></tr>`;
-        html += `<tr><td colspan="${cols}"></td></tr>`;
-        html += `<tr><td colspan="${cols}" style="font-weight:bold;">Finca: ${finca} &nbsp;&nbsp;&nbsp; Responsable: ${responsable} &nbsp;&nbsp;&nbsp; Fecha: ${fecha}</td></tr>`;
-        html += `<tr>${headers.map(h => `<td ${hdrStyle}>${h}</td>`).join('')}</tr>`;
-
-        loans.forEach(l => {
-            const values = [
-                displayDate(l.date),
-                escapeHTML(l.timeOut),
-                escapeHTML(l.worker),
-                escapeHTML(l.toolName),
-                TOOL_CATEGORY_LABELS[l.category] || escapeHTML(l.category),
-                l.quantity,
-                escapeHTML(l.timeIn),
-                l.timeIn ? l.returnedQty : '',
-                escapeHTML(loanStatusText(l)),
-                escapeHTML(l.observation),
-                ''
-            ];
-            html += `<tr>${values.map(v => `<td ${cellStyle}>${v}</td>`).join('')}</tr>`;
+        const html = registerTableHTML({
+            name: R019_NAME,
+            finca: toolLogFinca.value.trim(),
+            responsable: toolLogResponsable.value.trim(),
+            fecha: rangeLabel(from, to),
+            headers: R019_HEADERS,
+            rows: toolLogRegisterRows(loans)
         });
 
-        html += `<tr><td colspan="${cols}"></td></tr>`;
-        html += `<tr><td colspan="${cols}">Observaciones: _________________________________________________</td></tr>`;
-        html += `<tr><td colspan="${cols}"></td></tr>`;
-        html += `<tr><td colspan="${cols}">Firma responsable: ______________________________</td></tr>`;
-        html += '</table>';
-
         const workerSuffix = worker ? `_${worker.replace(/\s+/g, '_')}` : '';
-        downloadExcel(html, `R019_herramientas${workerSuffix}_${from}_al_${to}.xls`,
-            '<style>@page { mso-page-orientation: landscape; margin: 0.75in 0.5in; }</style>');
+        downloadExcel(html, `R019_herramientas${workerSuffix}_${from}_al_${to}.xls`, REGISTER_EXCEL_HEAD);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// --- IMPRIMIR BASE DE DATOS Y REGISTROS (ADMIN) ---
+
+const TRANSACTION_TYPE_LABELS = {
+    adelanto: 'Adelanto',
+    viveres: 'Víveres / Raciones',
+    prestamo: 'Préstamo / Avance',
+    otro_descuento: 'Otro descuento'
+};
+
+function printTableHTML(title, headers, rows, totalRow = null) {
+    const body = rows.map(r => `<tr>${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')
+        || `<tr><td colspan="${headers.length}">Sin registros</td></tr>`;
+    const total = totalRow ? `<tr class="print-total">${totalRow.map(v => `<td>${v}</td>`).join('')}</tr>` : '';
+    return `<section class="print-section">
+        <h2>${title} (${rows.length})</h2>
+        <table class="print-table">
+            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+            <tbody>${body}${total}</tbody>
+        </table>
+    </section>`;
+}
+
+function renderReportWorkers(workers) {
+    const checked = new Set([...reportWorkerList.querySelectorAll('input:checked')].map(c => c.value));
+    reportWorkerList.innerHTML = workers.map(w => `
+        <label><input type="checkbox" value="${escapeHTML(w.name)}"${checked.has(w.name) ? ' checked' : ''}> ${escapeHTML(w.name)}</label>
+    `).join('') || '<p class="report-hint">No hay trabajadores registrados</p>';
+}
+
+function setReportWorkersChecked(checked) {
+    reportWorkerList.querySelectorAll('input[type="checkbox"]').forEach(c => { c.checked = checked; });
+}
+
+// null = todos los trabajadores; si no, el Set con los nombres marcados
+function selectedReportWorkers() {
+    if (document.querySelector('input[name="reportWorkerMode"]:checked').value === 'todos') return null;
+    return new Set([...reportWorkerList.querySelectorAll('input:checked')].map(c => c.value));
+}
+
+function onlySelectedWorkers(list, selected) {
+    return selected ? list.filter(r => selected.has(r.worker)) : list;
+}
+
+function workersFileSuffix(selected) {
+    if (!selected) return '';
+    return selected.size === 1 ? `_${[...selected][0].replace(/\s+/g, '_')}` : `_${selected.size}_trabajadores`;
+}
+
+async function printDatabase() {
+    const tables = [...document.querySelectorAll('.report-table-check:checked')].map(c => c.value);
+    if (tables.length === 0) return alert('Marque al menos una tabla para imprimir');
+
+    const selected = selectedReportWorkers();
+    if (selected && selected.size === 0) return alert('Marque al menos un trabajador o elija "Todos los trabajadores"');
+
+    const allDates = reportAllDates.checked;
+    const from = allDates ? '' : reportFrom.value;
+    const to = allDates ? '' : reportTo.value;
+    if (!allDates && (!from || !to)) return alert('Seleccione el rango de fechas o marque "Todo el historial"');
+    if (from > to) return alert('La fecha "Desde" no puede ser posterior a "Hasta"');
+
+    const wants = t => tables.includes(t);
+    const inRange = r => allDates || (r.date >= from && r.date <= to);
+    const byDate = (a, b) => a.date.localeCompare(b.date) || a.id - b.id;
+
+    try {
+        const [workers, records, fruit, transactions, tools, loans] = await Promise.all([
+            wants('trabajadores') ? SupabaseDB.getWorkers().then(list => selected ? list.filter(w => selected.has(w.name)) : list) : [],
+            wants('asistencia') ? SupabaseDB.getRecords().then(list => onlySelectedWorkers(list, selected)) : [],
+            wants('fruta') ? SupabaseDB.getFruitRecords() : [],
+            wants('movimientos') ? SupabaseDB.getTransactions({ from, to }).then(list => onlySelectedWorkers(list, selected)) : [],
+            wants('herramientas') ? SupabaseDB.getTools() : [],
+            wants('herramientas') ? SupabaseDB.getToolLoans({ from, to }).then(list => onlySelectedWorkers(list, selected)) : []
+        ]);
+
+        let html = '';
+
+        if (wants('trabajadores')) {
+            html += printTableHTML('Trabajadores', ['N°', 'Nombre'],
+                workers.map((w, i) => [i + 1, escapeHTML(w.name)]));
+        }
+
+        if (wants('asistencia')) {
+            html += printTableHTML('Asistencia',
+                ['Fecha', 'Trabajador', 'Tipo', 'Hora', 'Estado', 'Detalle', 'Ubicación', 'Observación'],
+                records.filter(inRange).sort(byDate).map(r => [
+                    displayDate(r.date),
+                    escapeHTML(r.worker),
+                    escapeHTML(r.type),
+                    escapeHTML(r.time),
+                    escapeHTML(r.status),
+                    escapeHTML(r.extra),
+                    r.lat === 0 && r.lon === 0 ? 'Sin GPS' : escapeHTML(`${r.lat}, ${r.lon}`),
+                    escapeHTML(r.observation)
+                ]));
+        }
+
+        if (wants('fruta')) {
+            const list = fruit.filter(inRange).sort(byDate);
+            const totalCrates = list.reduce((s, r) => s + Number(r.crates || 0), 0);
+            const totalKg = list.reduce((s, r) => s + (r.type === 'Nacional' ? 0 : Number(r.weight || 0)), 0);
+            html += printTableHTML('Envío de fruta',
+                ['Fecha', 'Hora', 'Tipo', 'Proveedor', 'Gavetas', 'Peso (kg)', 'Observación'],
+                list.map(r => [
+                    displayDate(r.date),
+                    escapeHTML(r.time),
+                    escapeHTML(r.type),
+                    escapeHTML(r.supplier),
+                    r.crates,
+                    r.type === 'Nacional' ? '' : Number(r.weight || 0).toFixed(1),
+                    escapeHTML(r.observation)
+                ]),
+                list.length ? ['TOTAL', '', '', '', totalCrates, totalKg.toFixed(1), ''] : null);
+        }
+
+        if (wants('movimientos')) {
+            const list = [...transactions].sort(byDate);
+            const total = list.reduce((s, t) => s + t.amount, 0);
+            html += printTableHTML('Movimientos de contabilidad',
+                ['Fecha', 'Trabajador', 'Tipo', 'Monto', 'Descripción'],
+                list.map(t => [
+                    displayDate(t.date),
+                    escapeHTML(t.worker),
+                    TRANSACTION_TYPE_LABELS[t.type] || escapeHTML(t.type),
+                    `$${t.amount.toFixed(2)}`,
+                    escapeHTML(t.description)
+                ]),
+                list.length ? ['TOTAL', '', '', `$${total.toFixed(2)}`, ''] : null);
+        }
+
+        if (wants('herramientas')) {
+            html += printTableHTML('Inventario de herramientas y equipos', ['Nombre', 'Tipo', 'Cantidad total'],
+                tools.map(t => [escapeHTML(t.name), TOOL_CATEGORY_LABELS[t.category] || escapeHTML(t.category), t.totalQty]));
+            html += printTableHTML('Salidas y retornos de herramientas',
+                ['Fecha', 'Trabajador', 'Herramienta / Equipo', 'Cant.', 'H. salida', 'H. retorno', 'Cant. dev.', 'Estado', 'Observación'],
+                [...loans].sort(byDate).map(l => [
+                    displayDate(l.date),
+                    escapeHTML(l.worker),
+                    escapeHTML(l.toolName),
+                    l.quantity,
+                    escapeHTML(l.timeOut),
+                    escapeHTML(l.timeIn),
+                    l.timeIn ? l.returnedQty : '',
+                    escapeHTML(loanStatusText(l)),
+                    escapeHTML(l.observation)
+                ]));
+        }
+
+        const finca = reportFinca.value.trim();
+        const periodo = allDates ? 'Todo el historial' : rangeLabel(from, to);
+        const header = `<div class="print-header">
+            <h1>Base de datos — Asistencia FSS</h1>
+            <p>${finca ? `Finca: ${escapeHTML(finca)} · ` : ''}Período: ${periodo} · Impreso: ${escapeHTML(new Date().toLocaleString())}</p>
+            <p>Trabajadores: ${selected ? [...selected].map(escapeHTML).join(', ') : 'Todos'}</p>
+        </div>`;
+
+        const suffix = workersFileSuffix(selected);
+        printDocument(allDates ? `Base_de_datos_completa${suffix}_${todayStr()}` : `Base_de_datos${suffix}_${from}_al_${to}`, header + html);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+// Una fila por trabajador por día, con entrada, salida y horas trabajadas
+async function attendanceRegisterData(from, to, selected) {
+    const [records, settings] = await Promise.all([SupabaseDB.getRecords(), SupabaseDB.getSettings()]);
+
+    const days = {};
+    onlySelectedWorkers(records, selected).filter(r => r.date >= from && r.date <= to).forEach(r => {
+        const key = `${r.date}|${r.worker}`;
+        if (!days[key]) days[key] = { date: r.date, worker: r.worker, entrada: null, salida: null };
+        if (r.type === 'Entrada') days[key].entrada = r;
+        if (r.type === 'Salida') days[key].salida = r;
+    });
+
+    const rows = Object.values(days)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.worker.localeCompare(b.worker))
+        .map(({ date, worker, entrada, salida }) => {
+            const inMins = entrada ? timeToMinutes(entrada.time) : null;
+            const outMins = salida ? timeToMinutes(salida.time) : null;
+            const worked = inMins !== null && outMins !== null && outMins >= inMins ? formatMinutes(outMins - inMins) : '';
+            const novedad = [entrada ? entrada.extra : 'Sin entrada', salida ? salida.extra : 'Sin salida']
+                .filter(n => n && !/^0m\b/.test(n)) // "0m Atraso" no es novedad
+                .join(' · ');
+            // 'Sin GPS' no aplica para el registro laboral
+            const observaciones = [...new Set([entrada, salida]
+                .filter(Boolean)
+                .map(r => r.observation)
+                .filter(o => o && o !== 'Sin GPS'))].join(' · ');
+            return [
+                displayDate(date),
+                escapeHTML(worker),
+                escapeHTML(entrada ? entrada.time : ''),
+                escapeHTML(salida ? salida.time : ''),
+                worked,
+                escapeHTML(novedad),
+                escapeHTML(observaciones),
+                ''
+            ];
+        });
+
+    return {
+        heading: 'CONTROL DE ASISTENCIA DEL PERSONAL',
+        subheading: `Jornada establecida: ${escapeHTML(settings.entryTime)} a ${escapeHTML(settings.exitTime)}`,
+        name: 'REGISTRO DE ENTRADA Y SALIDA DE TRABAJADORES',
+        headers: ['Fecha', 'Trabajador', 'Hora entrada', 'Hora salida', 'Horas trabajadas', 'Novedad', 'Observaciones', 'Firma trabajador'],
+        rows,
+        fileName: `Registro_asistencia${workersFileSuffix(selected)}`
+    };
+}
+
+// R014 a partir de Envío de Fruta; Cliente y Responsable quedan en blanco para llenar a mano
+async function dispatchRegisterData(from, to) {
+    const fruit = await SupabaseDB.getFruitRecords();
+    const rows = fruit
+        .filter(r => r.date >= from && r.date <= to)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+        .map(r => {
+            const kg = r.type !== 'Nacional' && r.weight > 0 ? ` · ${Number(r.weight).toFixed(1)} kg` : '';
+            return [displayDate(r.date), escapeHTML(r.supplier), `${r.crates} gav.${kg}`, '', escapeHTML(r.type), ''];
+        });
+
+    return {
+        name: 'R014 – DESPACHO',
+        headers: ['Fecha', 'Lote / Proveedor', 'Cantidad', 'Cliente', 'Destino', 'Responsable'],
+        rows,
+        fileName: 'R014_despacho'
+    };
+}
+
+async function toolRegisterData(from, to, selected) {
+    const loans = onlySelectedWorkers(await SupabaseDB.getToolLoans({ from, to }), selected);
+    return {
+        name: R019_NAME,
+        headers: R019_HEADERS,
+        rows: toolLogRegisterRows(loans),
+        fileName: `R019_herramientas${workersFileSuffix(selected)}`
+    };
+}
+
+const REGISTER_BUILDERS = {
+    asistencia: attendanceRegisterData,
+    r014: dispatchRegisterData,
+    r019: toolRegisterData
+};
+
+async function buildRegister() {
+    const from = reportFrom.value;
+    const to = reportTo.value;
+    if (!from || !to) {
+        alert('Seleccione el rango de fechas del registro');
+        return null;
+    }
+    if (from > to) {
+        alert('La fecha "Desde" no puede ser posterior a "Hasta"');
+        return null;
+    }
+
+    const selected = selectedReportWorkers();
+    if (selected && selected.size === 0) {
+        alert('Marque al menos un trabajador o elija "Todos los trabajadores"');
+        return null;
+    }
+
+    const { fileName, ...register } = await REGISTER_BUILDERS[reportRegister.value](from, to, selected);
+    if (register.rows.length === 0) {
+        alert('No hay registros en este rango de fechas');
+        return null;
+    }
+
+    return {
+        fileName: `${fileName}_${from}_al_${to}`,
+        html: registerTableHTML({
+            ...register,
+            finca: reportFinca.value.trim(),
+            responsable: reportResponsable.value.trim(),
+            fecha: rangeLabel(from, to)
+        })
+    };
+}
+
+async function printRegister() {
+    try {
+        const register = await buildRegister();
+        if (register) printDocument(register.fileName, `<div class="print-register">${register.html}</div>`);
+    } catch (err) {
+        handleDbError(err);
+    }
+}
+
+async function exportRegisterExcel() {
+    try {
+        const register = await buildRegister();
+        if (register) downloadExcel(register.html, `${register.fileName}.xls`, REGISTER_EXCEL_HEAD);
     } catch (err) {
         handleDbError(err);
     }
